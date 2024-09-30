@@ -154,7 +154,7 @@ void *generateTilesForZoomLevel(void *arg) {
 
 void generateTilesForZoomLevels(uint64_t seed, const char *outputDir) {
     ZoomLevelParams zoomLevels[] = {
-        // {seed, outputDir, 3, 96, 128, 1},
+    // {seed, outputDir, 3, 96, 128, 1},
         {seed, outputDir, 3, 96, 128, 8},
         {seed, outputDir, 4, 48, 128, 16},
         {seed, outputDir, 5, 24, 128, 32},
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     startTime = time(NULL);
 
     char outputDir[2048];
-    snprintf(outputDir, sizeof(outputDir), "/var/www/gme-backend/storage/app/public/tiles");
+    snprintf(outputDir, sizeof(outputDir), "/var/www/development/gme-backend/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;
