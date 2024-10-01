@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     startTime = time(NULL);
 
     char outputDir[2048];
-    snprintf(outputDir, sizeof(outputDir), "/var/www/development/gme-backend/storage/app/public/tiles");
+    snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;
@@ -200,3 +200,4 @@ int main(int argc, char *argv[]) {
     printf("All tiles generated. Total time taken: %.2f seconds\n", difftime(time(NULL), startTime));
     return 0;
 }
+
