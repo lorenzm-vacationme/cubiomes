@@ -82,7 +82,7 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
     unsigned char *rgb = (unsigned char *)malloc(3 * imgWidth * imgHeight);
     if (!rgb) {
         fprintf(stderr, "Error allocating memory for image\n");
-        free(biomeIds);
+        free(biomeIds); // Ensure biomeIds is freed
         return;
     }
 
@@ -107,6 +107,7 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
         pthread_mutex_unlock(&mutex);
     }
 
+    // Free allocated memory
     free(biomeIds);
     free(rgb);
 }
@@ -179,9 +180,15 @@ void generateTilesForZoomLevels(uint64_t seed, const char *outputDir) {
     for (int i = 0; i < numZoomLevels; i++) {
         if (pthread_create(&threads[i], NULL, generateTilesForZoomLevel, (void *)&zoomLevels[i]) != 0) {
             fprintf(stderr, "Error creating thread for zoom level %d\n", zoomLevels[i].zoomLevel);
+            // Optionally, clean up already created threads here
+            for (int j = 0; j < i; j++) {
+                pthread_join(threads[j], NULL);
+            }
+            return; // Exit if thread creation fails
         }
     }
 
+    // Join threads to ensure they complete before exiting the function
     for (int i = 0; i < numZoomLevels; i++) {
         pthread_join(threads[i], NULL);
     }
