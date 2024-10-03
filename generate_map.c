@@ -10,29 +10,15 @@
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
-#include <dirent.h>
 
 int totalTiles = 0;
 int completedTiles = 0;
 time_t startTime;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-
-// Define thread pool size
-#define MAX_THREADS 4
-
-// Thread pool structure
-typedef struct {
-    pthread_t threads[MAX_THREADS];
-    int busy[MAX_THREADS];
-    pthread_mutex_t lock;
-} ThreadPool;
 
 // Define the batch size
 #define BATCH_SIZE 100
-
-ThreadPool threadPool;
 
 int createDir(const char *path) {
     char tmp[2048];
@@ -64,25 +50,7 @@ int createDir(const char *path) {
     return 0;
 }
 
-// Check if the tile already exists to prevent regeneration
-int tileExists(const char *outputFile) {
-    struct stat buffer;
-    return (stat(outputFile, &buffer) == 0);
-}
-
-// Function to generate a single tile
 void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSize, const char *outputDir, int zoomLevel, int scale) {
-    char outputFile[8192];
-    snprintf(outputFile, sizeof(outputFile), "%s/%lu/%d/%d/%d.png", outputDir, seed, zoomLevel, tileX, tileY);
-
-    // Check if tile already exists (cache check)
-    if (tileExists(outputFile)) {
-        pthread_mutex_lock(&mutex);
-        completedTiles++;
-        pthread_mutex_unlock(&mutex);
-        return;
-    }
-
     setupGenerator(g, MC_1_18, LARGE_BIOMES);
     applySeed(g, DIM_OVERWORLD, seed);
 
@@ -120,8 +88,9 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
 
     biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
 
-    char tileDir[4096];
+    char tileDir[4096], outputFile[8192];
     snprintf(tileDir, sizeof(tileDir), "%s/%lu/%d/%d", outputDir, seed, zoomLevel, tileX);
+    snprintf(outputFile, sizeof(outputFile), "%s/%d.png", tileDir, tileY);
 
     if (createDir(tileDir) != 0 || savePNG(outputFile, rgb, imgWidth, imgHeight) != 0) {
         fprintf(stderr, "Error saving image file for tile %d_%d at zoom level %d\n", tileX, tileY, zoomLevel);
@@ -130,8 +99,8 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
         completedTiles++;
         double elapsedSeconds = difftime(time(NULL), startTime);
         double estimatedTotalTime = (elapsedSeconds / completedTiles) * totalTiles;
-        printf("Tile %d of %d generated and saved to %s\nEstimated time remaining: %.2f seconds\n",
-               completedTiles, totalTiles, outputFile, estimatedTotalTime - elapsedSeconds);
+        printf("Tile %d of %d generated and saved to %s\nEstimated time remaining: %.2f seconds\n", 
+                completedTiles, totalTiles, outputFile, estimatedTotalTime - elapsedSeconds);
         pthread_mutex_unlock(&mutex);
     }
 
@@ -148,15 +117,17 @@ typedef struct {
     int tile_count;
 } ZoomLevelParams;
 
-// Thread worker function
-void *worker(void *arg) {
+void *generateTilesForZoomLevel(void *arg) {
     ZoomLevelParams *params = (ZoomLevelParams *)arg;
-    Generator g;
     int tileSize = params->base_tile_size;
+    Generator g;
+
     int x = params->tile_count / 2;
     int y = x;
     int dx = 0, dy = -1;
     int segmentLength = 1, segmentPassed = 0, turnsMade = 0;
+
+    setupGenerator(&g, MC_1_18, LARGE_BIOMES);
 
     for (int i = 0; i < params->tile_count * params->tile_count; ++i) {
         if (x >= 0 && x < params->tile_count && y >= 0 && y < params->tile_count) {
@@ -184,37 +155,6 @@ void *worker(void *arg) {
     pthread_exit(NULL);
 }
 
-// Initialize the thread pool
-void initThreadPool(ThreadPool *pool) {
-    pthread_mutex_init(&pool->lock, NULL);
-    for (int i = 0; i < MAX_THREADS; i++) {
-        pool->busy[i] = 0;
-    }
-}
-
-// Assign a job to an available thread
-void assignJob(ThreadPool *pool, ZoomLevelParams *params) {
-    pthread_mutex_lock(&pool->lock);
-    for (int i = 0; i < MAX_THREADS; i++) {
-        if (!pool->busy[i]) {
-            pthread_create(&pool->threads[i], NULL, worker, params);
-            pool->busy[i] = 1;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&pool->lock);
-}
-
-// Wait for all threads to finish
-void waitForThreads(ThreadPool *pool) {
-    for (int i = 0; i < MAX_THREADS; i++) {
-        if (pool->busy[i]) {
-            pthread_join(pool->threads[i], NULL);
-            pool->busy[i] = 0;
-        }
-    }
-}
-
 void generateTilesForZoomLevels(uint64_t seed, const char *outputDir) {
     ZoomLevelParams zoomLevels[] = {
         {seed, outputDir, 3, 96, 128, 8},
@@ -229,16 +169,23 @@ void generateTilesForZoomLevels(uint64_t seed, const char *outputDir) {
         totalTiles += zoomLevels[i].tile_count * zoomLevels[i].tile_count;
     }
 
-    // Initialize the thread pool
-    initThreadPool(&threadPool);
+    int availableCores = sysconf(_SC_NPROCESSORS_ONLN);
+    int maxThreads = (availableCores > 2) ? availableCores / 2 : 1;
 
-    // Assign jobs to threads
-    for (int i = 0; i < numZoomLevels; i++) {
-        assignJob(&threadPool, &zoomLevels[i]);
+    pthread_t threads[maxThreads];
+    for (int i = 0; i < maxThreads && i < numZoomLevels; i++) {
+        if (pthread_create(&threads[i], NULL, generateTilesForZoomLevel, (void *)&zoomLevels[i]) != 0) {
+            fprintf(stderr, "Error creating thread for zoom level %d\n", zoomLevels[i].zoomLevel);
+            for (int j = 0; j < i; j++) {
+                pthread_join(threads[j], NULL);
+            }
+            return;
+        }
     }
 
-    // Wait for all threads to finish
-    waitForThreads(&threadPool);
+    for (int i = 0; i < maxThreads && i < numZoomLevels; i++) {
+        pthread_join(threads[i], NULL);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -253,8 +200,12 @@ int main(int argc, char *argv[]) {
     char outputDir[2048];
     snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
 
-    // Generate tiles for multiple zoom levels
+    if (createDir(outputDir) != 0) {
+        return 1;
+    }
+
     generateTilesForZoomLevels(seed, outputDir);
 
+    printf("All tiles generated. Total time taken: %.2f seconds\n", difftime(time(NULL), startTime));
     return 0;
 }
