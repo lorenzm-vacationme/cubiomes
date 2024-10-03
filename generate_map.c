@@ -17,6 +17,9 @@ time_t startTime;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Define the batch size
+#define BATCH_SIZE 100
+
 int createDir(const char *path) {
     char tmp[2048];
     char *p = tmp;
@@ -49,7 +52,6 @@ int createDir(const char *path) {
 
     return 0;
 }
-
 
 void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSize, const char *outputDir, int zoomLevel, int scale) {
     setupGenerator(g, MC_1_18, LARGE_BIOMES);
@@ -147,6 +149,13 @@ void *generateTilesForZoomLevel(void *arg) {
             segmentPassed = 0;
             if (++turnsMade % 2 == 0) segmentLength++;
         }
+
+        // Handle batching
+        if ((i + 1) % BATCH_SIZE == 0) {
+            pthread_mutex_lock(&mutex);
+            printf("Processed batch of %d tiles for zoom level %d\n", BATCH_SIZE, params->zoomLevel);
+            pthread_mutex_unlock(&mutex);
+        }
     }
 
     pthread_exit(NULL);
@@ -154,7 +163,6 @@ void *generateTilesForZoomLevel(void *arg) {
 
 void generateTilesForZoomLevels(uint64_t seed, const char *outputDir) {
     ZoomLevelParams zoomLevels[] = {
-    // {seed, outputDir, 3, 96, 128, 1},
         {seed, outputDir, 3, 96, 128, 8},
         {seed, outputDir, 4, 48, 128, 16},
         {seed, outputDir, 5, 24, 128, 32},
@@ -189,7 +197,7 @@ int main(int argc, char *argv[]) {
     startTime = time(NULL);
 
     char outputDir[2048];
-    snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
+    snprintf(outputDir, sizeof(outputDir), "/var/www/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;
@@ -200,4 +208,3 @@ int main(int argc, char *argv[]) {
     printf("All tiles generated. Total time taken: %.2f seconds\n", difftime(time(NULL), startTime));
     return 0;
 }
-
