@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
         pthread_join(threads[i], NULL);
     }
 
-    const char *dirUrl = "/var/www/staging/gme-backend/storage/app/public/images/seeds";
+    const char *dirUrl = "/var/www/production/gme-backend/storage/app/public/images/seeds";
 
     if (createDir(dirUrl) != 0) {
         free(biomeIds);
