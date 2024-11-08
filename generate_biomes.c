@@ -76,7 +76,15 @@ int main(int argc, char *argv[]) {
     setupGenerator(&g, MC_1_18, LARGE_BIOMES);
     applySeed(&g, DIM_OVERWORLD, seed);
 
-    Range r = { .scale = 16, .x = -60, .z = -60, .sx = 400, .sz = 320, .y = 15, .sy = 1 };
+Range r = { 
+    .scale = 128,      // Scale remains the same or adjust as needed
+    .x = 0,            // Center x coordinate
+    .z = 0,            // Center z coordinate
+    .sx = 400,         // Width of the area to generate, should be a multiple of 16
+    .sz = 320,         // Height of the area to generate, should also be a multiple of 16
+    .y = 64,           // Adjusted y-coordinate to represent sea level in the overworld
+    .sy = 1            // Y scaling factor, typically remains as is
+};
 
     int *biomeIds = allocCache(&g, r);
     genBiomes(&g, biomeIds, r);
@@ -112,7 +120,7 @@ int main(int argc, char *argv[]) {
         pthread_join(threads[i], NULL);
     }
 
-    const char *dirUrl = "/var/www/production/gme-backend/storage/app/public/images/seeds";
+    const char *dirUrl = "/var/www/staging/gme-backend/storage/app/public/images/seeds";
 
     if (createDir(dirUrl) != 0) {
         free(biomeIds);

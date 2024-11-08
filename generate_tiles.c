@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <pthread.h>
 #include <time.h>
 
 // Function to create directories as needed
@@ -44,8 +45,29 @@ int createDir(const char *path) {
     return 0;
 }
 
+// Structure to hold parameters for tile generation
+typedef struct {
+    Generator *g;
+    uint64_t seed;
+    int tileX;
+    int tileY;
+    int tileSize;
+    const char *outputDir;
+    int zoomLevel;
+    int scale;
+} TileParams;
+
 // Function to generate a single tile based on OpenLayers request parameters
-void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSize, const char *outputDir, int zoomLevel, int scale) {
+void generateTile(TileParams *params) {
+    Generator *g = params->g;
+    uint64_t seed = params->seed;
+    int tileX = params->tileX;
+    int tileY = params->tileY;
+    int tileSize = params->tileSize;
+    const char *outputDir = params->outputDir;
+    int zoomLevel = params->zoomLevel;
+    int scale = params->scale;
+
     setupGenerator(g, MC_1_18, LARGE_BIOMES);
     applySeed(g, DIM_OVERWORLD, seed);
 
@@ -98,6 +120,13 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
     free(rgb);
 }
 
+void *generateTileThread(void *arg) {
+    TileParams *params = (TileParams *)arg;
+    generateTile(params);
+    free(params); // Free the allocated parameter structure
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 6) {
         fprintf(stderr, "Usage: %s <seed> <tileX> <tileY> <zoomLevel> <scale>\n", argv[0]);
@@ -112,7 +141,7 @@ int main(int argc, char *argv[]) {
     int scale = atoi(argv[5]);
 
     // Set the base tile size (e.g., 128 or dynamic based on zoom level)
-    int tileSize = 128;  // This can be adjusted based on zoom level or as needed
+    int tileSize = 96;  // This can be adjusted based on zoom level or as needed
 
     char outputDir[2048];
     snprintf(outputDir, sizeof(outputDir), "/var/www/staging/gme-backend/storage/app/public/tiles");
@@ -122,8 +151,27 @@ int main(int argc, char *argv[]) {
     }
 
     Generator g;
-    generateTile(&g, seed, tileX, tileY, tileSize, outputDir, zoomLevel, scale);
+    
+    // Create a thread for tile generation
+    pthread_t thread;
+    TileParams *params = malloc(sizeof(TileParams)); // Allocate memory for parameters
+    if (!params) {
+        fprintf(stderr, "Error allocating memory for parameters\n");
+        return 1;
+    }
 
+    *params = (TileParams){ &g, seed, tileX, tileY, tileSize, outputDir, zoomLevel, scale };
+
+    // Create a thread for tile generation
+    if (pthread_create(&thread, NULL, generateTileThread, params) != 0) {
+        fprintf(stderr, "Error creating thread\n");
+        free(params);
+        return 1;
+    }
+
+    // Wait for the thread to finish
+    pthread_join(thread, NULL);
+    
     printf("Tile generated successfully.\n");
     return 0;
 }
