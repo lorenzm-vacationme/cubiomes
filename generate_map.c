@@ -92,7 +92,8 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
     biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
 
     char tileDir[4096], outputFile[8192];
-    snprintf(tileDir, sizeof(tileDir), "%s/%lu/%d/%d", outputDir, seed, zoomLevel, tileX);
+    // snprintf(tileDir, sizeof(tileDir), "%s/%lu/%d/%d", outputDir, seed, zoomLevel, tileX);
+    snprintf(tileDir, sizeof(tileDir), "%s/%lld/%d/%d", outputDir, (long long)seed, zoomLevel, tileX);
     snprintf(outputFile, sizeof(outputFile), "%s/%d.png", tileDir, tileY);
 
     if (createDir(tileDir) != 0 || savePNG(outputFile, rgb, imgWidth, imgHeight) != 0) {
@@ -194,17 +195,47 @@ void generateTilesForZoomLevels(uint64_t seed, const char *outputDir) {
     }
 }
 
+// int main(int argc, char *argv[]) {
+//     if (argc != 2) {
+//         fprintf(stderr, "Usage: %s <seed>\n", argv[0]);
+//         return 1;
+//     }
+
+//     uint64_t seed = strtoull(argv[1], NULL, 10);
+//     startTime = time(NULL);
+
+//     char outputDir[2048];
+//     snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
+
+//     if (createDir(outputDir) != 0) {
+//         return 1;
+//     }
+
+//     generateTilesForZoomLevels(seed, outputDir);
+
+//     printf("All tiles generated. Total time taken: %.2f seconds\n", difftime(time(NULL), startTime));
+//     return 0;
+// }
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <seed>\n", argv[0]);
         return 1;
     }
 
-    uint64_t seed = strtoull(argv[1], NULL, 10);
+    char *endptr;
+    int64_t seed = strtoll(argv[1], &endptr, 10); // Parse seed as signed 64-bit integer
+
+    // Check for parsing errors
+    if (*endptr != '\0') {
+        fprintf(stderr, "Invalid seed value: %s\n", argv[1]);
+        return 1;
+    }
+
     startTime = time(NULL);
 
     char outputDir[2048];
-    snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
+    snprintf(outputDir, sizeof(outputDir), "/var/www/gme-backend/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;

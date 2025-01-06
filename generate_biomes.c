@@ -120,7 +120,7 @@ Range r = {
         pthread_join(threads[i], NULL);
     }
 
-    const char *dirUrl = "/var/www/production/gme-backend/storage/app/public/images/seeds";
+    const char *dirUrl = "/var/www/gme-backend/storage/app/public/images/seeds";
 
     if (createDir(dirUrl) != 0) {
         free(biomeIds);
@@ -129,7 +129,7 @@ Range r = {
     }
 
     char outputFile[256];
-    snprintf(outputFile, sizeof(outputFile), "%s/seed_%lu.ppm", dirUrl, (unsigned long)seed);
+    snprintf(outputFile, sizeof(outputFile), "%s/seed_%lu.ppm", dirUrl, seed);
 
     if (savePPM(outputFile, rgb, imgWidth, imgHeight) != 0) {
         fprintf(stderr, "Error saving PPM file\n");
