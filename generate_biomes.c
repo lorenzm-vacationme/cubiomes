@@ -70,11 +70,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    uint64_t seed = strtoull(argv[1], NULL, 10);
+    // uint64_t seed = strtoull(argv[1], NULL, 10);
+    int64_t seed = strtoll(argv[1], NULL, 10);
+
 
     Generator g;
     setupGenerator(&g, MC_1_18, LARGE_BIOMES);
-    applySeed(&g, DIM_OVERWORLD, seed);
+    applySeed(&g, DIM_OVERWORLD, (uint64_t)seed);
 
 Range r = { 
     .scale = 128,      // Scale remains the same or adjust as needed
@@ -120,7 +122,7 @@ Range r = {
         pthread_join(threads[i], NULL);
     }
 
-    const char *dirUrl = "/var/www/gme-backend/storage/app/public/images/seeds";
+    const char *dirUrl = "/var/www/production/gme-backend/storage/app/public/images/seeds";
 
     if (createDir(dirUrl) != 0) {
         free(biomeIds);
@@ -129,7 +131,9 @@ Range r = {
     }
 
     char outputFile[256];
-    snprintf(outputFile, sizeof(outputFile), "%s/seed_%lu.ppm", dirUrl, seed);
+    // snprintf(outputFile, sizeof(outputFile), "%s/seed_%lu.ppm", dirUrl, seed);
+    snprintf(outputFile, sizeof(outputFile), "%s/seed_%s%lld.ppm", dirUrl, (seed < 0 ? "-" : ""), llabs(seed));
+
 
     if (savePPM(outputFile, rgb, imgWidth, imgHeight) != 0) {
         fprintf(stderr, "Error saving PPM file\n");
