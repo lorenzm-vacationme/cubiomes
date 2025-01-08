@@ -48,7 +48,8 @@ int createDir(const char *path) {
 // Structure to hold parameters for tile generation
 typedef struct {
     Generator *g;
-    uint64_t seed;
+    // uint64_t seed;
+    int64_t seed;
     int tileX;
     int tileY;
     int tileSize;
@@ -58,9 +59,72 @@ typedef struct {
 } TileParams;
 
 // Function to generate a single tile based on OpenLayers request parameters
+// void generateTile(TileParams *params) {
+//     Generator *g = params->g;
+//     uint64_t seed = params->seed;
+//     int tileX = params->tileX;
+//     int tileY = params->tileY;
+//     int tileSize = params->tileSize;
+//     const char *outputDir = params->outputDir;
+//     int zoomLevel = params->zoomLevel;
+//     int scale = params->scale;
+
+//     setupGenerator(g, MC_1_18, LARGE_BIOMES);
+//     applySeed(g, DIM_OVERWORLD, seed);
+
+//     Range r = {
+//         .scale = scale,
+//         .x = tileX * tileSize,
+//         .z = tileY * tileSize,
+//         .sx = tileSize,
+//         .sz = tileSize,
+//         .y = 15,
+//         .sy = 1
+//     };
+
+//     int *biomeIds = allocCache(g, r);
+//     if (!biomeIds) {
+//         fprintf(stderr, "Error allocating memory for biomes\n");
+//         return;
+//     }
+
+//     genBiomes(g, biomeIds, r);
+
+//     int pix4cell = 4;
+//     int imgWidth = pix4cell * r.sx;
+//     int imgHeight = pix4cell * r.sz;
+
+//     unsigned char *rgb = (unsigned char *)malloc(3 * imgWidth * imgHeight);
+//     if (!rgb) {
+//         fprintf(stderr, "Error allocating memory for image\n");
+//         free(biomeIds); // Ensure biomeIds is freed
+//         return;
+//     }
+
+//     unsigned char biomeColors[256][3];
+//     initBiomeColors(biomeColors);
+
+//     biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
+
+//     char tileDir[4096], outputFile[8192];
+//     // snprintf(tileDir, sizeof(tileDir), "%s/%lu/%d/%d", outputDir, seed, zoomLevel, tileX);
+//     snprintf(tileDir, sizeof(tileDir), "%s/%lld/%d/%d", outputDir, llabs(seed), zoomLevel, tileX);
+//     snprintf(outputFile, sizeof(outputFile), "%s/%d.png", tileDir, tileY);
+
+//     if (createDir(tileDir) != 0 || savePNG(outputFile, rgb, imgWidth, imgHeight) != 0) {
+//         fprintf(stderr, "Error saving image file for tile %d_%d at zoom level %d\n", tileX, tileY, zoomLevel);
+//     } else {
+//         printf("Tile %d_%d at zoom level %d generated and saved to %s\n", tileX, tileY, zoomLevel, outputFile);
+//     }
+
+//     // Free allocated memory
+//     free(biomeIds);
+//     free(rgb);
+// }
+
 void generateTile(TileParams *params) {
     Generator *g = params->g;
-    uint64_t seed = params->seed;
+    int64_t seed = params->seed;
     int tileX = params->tileX;
     int tileY = params->tileY;
     int tileSize = params->tileSize;
@@ -96,7 +160,7 @@ void generateTile(TileParams *params) {
     unsigned char *rgb = (unsigned char *)malloc(3 * imgWidth * imgHeight);
     if (!rgb) {
         fprintf(stderr, "Error allocating memory for image\n");
-        free(biomeIds); // Ensure biomeIds is freed
+        free(biomeIds);
         return;
     }
 
@@ -106,7 +170,8 @@ void generateTile(TileParams *params) {
     biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
 
     char tileDir[4096], outputFile[8192];
-    snprintf(tileDir, sizeof(tileDir), "%s/%lu/%d/%d", outputDir, seed, zoomLevel, tileX);
+    // snprintf(tileDir, sizeof(tileDir), "%s/%lld/%d/%d", outputDir, seed, zoomLevel, tileX);
+    snprintf(tileDir, sizeof(tileDir), "%s/%ld/%d/%d", outputDir, seed, zoomLevel, tileX);
     snprintf(outputFile, sizeof(outputFile), "%s/%d.png", tileDir, tileY);
 
     if (createDir(tileDir) != 0 || savePNG(outputFile, rgb, imgWidth, imgHeight) != 0) {
@@ -115,10 +180,10 @@ void generateTile(TileParams *params) {
         printf("Tile %d_%d at zoom level %d generated and saved to %s\n", tileX, tileY, zoomLevel, outputFile);
     }
 
-    // Free allocated memory
     free(biomeIds);
     free(rgb);
 }
+
 
 void *generateTileThread(void *arg) {
     TileParams *params = (TileParams *)arg;
@@ -134,7 +199,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse input arguments
-    uint64_t seed = strtoull(argv[1], NULL, 10);
+    // uint64_t seed = strtoull(argv[1], NULL, 10);
+    int64_t seed = strtoll(argv[1], NULL, 10);
     int tileX = atoi(argv[2]);
     int tileY = atoi(argv[3]);
     int zoomLevel = atoi(argv[4]);
@@ -144,7 +210,9 @@ int main(int argc, char *argv[]) {
     int tileSize = 96;  // This can be adjusted based on zoom level or as needed
 
     char outputDir[2048];
+    // snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
     snprintf(outputDir, sizeof(outputDir), "/var/www/staging/gme-backend/storage/app/public/tiles");
+    // snprintf(outputDir, sizeof(outputDir), "/var/www/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;
