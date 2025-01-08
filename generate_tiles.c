@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
     int tileSize = 96;  // This can be adjusted based on zoom level or as needed
 
     char outputDir[2048];
-    snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
+    snprintf(outputDir, sizeof(outputDir), "/var/www/staging/gme-backend/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;
