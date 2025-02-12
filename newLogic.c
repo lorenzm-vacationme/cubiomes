@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     char outputDir[200];
     snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles/%d/%d/%d", seed, zoom, x);
     // snprintf(outputDir, sizeof(outputDir), "/var/www/production/gme-backend/storage/app/public/tiles");
-
+ 
     // Create directories recursively
     createDirectories(outputDir);
 
