@@ -1,153 +1,46 @@
+// generate an image of the world
 #include "generator.h"
 #include "util.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <errno.h>
-#include <pthread.h>
 
-#define NUM_THREADS 4 // Adjust this based on the number of CPU cores
-
-typedef struct {
-    unsigned char *rgb;
-    unsigned char (*biomeColors)[3];
-    int *biomeIds;
-    int startRow;
-    int endRow;
-    int pix4cell;
-    int sx;
-    int sz;
-} BiomeToImageArgs;
-
-// Function to recursively create directories
-int createDir(const char *path) {
-    char tmp[256];
-    snprintf(tmp, sizeof(tmp), "%s", path);
-    for (char *p = tmp + 1; *p; p++) {
-        if (*p == '/') {
-            *p = '\0';
-            if (mkdir(tmp, 0777) && errno != EEXIST) {
-                perror("Error creating directory");
-                return -1;
-            }
-            *p = '/';
-        }
-    }
-    if (mkdir(tmp, 0777) && errno != EEXIST) {
-        perror("Error creating directory");
-        return -1;
-    }
-    return 0;
-}
-
-// Function to convert biomes to image (parallelized)
-void* biomesToImageParallel(void *args) {
-    BiomeToImageArgs *data = (BiomeToImageArgs *)args;
-    int i, j, k;
-    for (i = data->startRow; i < data->endRow; i++) {
-        for (j = 0; j < data->sx; j++) {
-            int biomeId = data->biomeIds[i * data->sx + j];
-            for (k = 0; k < data->pix4cell; k++) {
-                int pixIdx = (i * data->pix4cell + k) * (data->sx * data->pix4cell) + (j * data->pix4cell);
-                for (int m = 0; m < data->pix4cell; m++) {
-                    int idx = 3 * (pixIdx + m);
-                    data->rgb[idx] = data->biomeColors[biomeId][0];
-                    data->rgb[idx + 1] = data->biomeColors[biomeId][1];
-                    data->rgb[idx + 2] = data->biomeColors[biomeId][2];
-                }
-            }
-        }
-    }
-    pthread_exit(NULL);
-}
-
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <seed>\n", argv[0]);
-        return 1;
-    }
-
-    // uint64_t seed = strtoull(argv[1], NULL, 10);
-    int64_t seed = strtoll(argv[1], NULL, 10);
-
-
+int main()
+{
     Generator g;
-    setupGenerator(&g, MC_1_18, LARGE_BIOMES);
-    applySeed(&g, DIM_OVERWORLD, (uint64_t)seed);
+    setupGenerator(&g, MC_1_20, 0);
 
-Range r = { 
-    .scale = 128,      // Scale remains the same or adjust as needed
-    .x = 0,            // Center x coordinate
-    .z = 0,            // Center z coordinate
-    .sx = 400,         // Width of the area to generate, should be a multiple of 16
-    .sz = 320,         // Height of the area to generate, should also be a multiple of 16
-    .y = 64,           // Adjusted y-coordinate to represent sea level in the overworld
-    .sy = 1            // Y scaling factor, typically remains as is
-};
+    uint64_t seed = 12345;
+    applySeed(&g, DIM_OVERWORLD, seed);
 
+    Range r;
+    // 1:16, a.k.a. horizontal chunk scaling
+    r.scale = 4;
+    // Define the position and size for a horizontal area:
+    r.x = 0, r.z = 0;   // position (x,z)
+    r.sx = 3000, r.sz = 3000; // size (width,height)
+    // Set the vertical range as a plane near sea level at scale 1:4.
+    r.y = 15, r.sy = 1;
+
+    // Allocate the necessary cache for this range.
     int *biomeIds = allocCache(&g, r);
+
+    // Generate the area inside biomeIds, indexed as:
+    // biomeIds[i_y*r.sx*r.sz + i_z*r.sx + i_x]
+    // where (i_x, i_y, i_z) is a position relative to the range cuboid.
     genBiomes(&g, biomeIds, r);
 
-    int pix4cell = 4;
-    int imgWidth = pix4cell * r.sx;
-    int imgHeight = pix4cell * r.sz;
-
+    // Map the biomes to an image buffer, with 4 pixels per biome cell.
+    int pix4cell = 16;
+    int imgWidth = pix4cell*r.sx, imgHeight = pix4cell*r.sz;
     unsigned char biomeColors[256][3];
     initBiomeColors(biomeColors);
+    unsigned char *rgb = (unsigned char *) malloc(3*imgWidth*imgHeight);
+    biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
 
-    unsigned char *rgb = (unsigned char *)malloc(3 * imgWidth * imgHeight);
+    // Save the RGB buffer to a PPM image file.
+    savePPM("map.ppm", rgb, imgWidth, imgHeight);
 
-    // Parallelize biomesToImage using pthreads
-    pthread_t threads[NUM_THREADS];
-    BiomeToImageArgs threadArgs[NUM_THREADS];
-    int rowsPerThread = r.sz / NUM_THREADS;
-
-    for (int i = 0; i < NUM_THREADS; i++) {
-        threadArgs[i].rgb = rgb;
-        threadArgs[i].biomeColors = biomeColors;
-        threadArgs[i].biomeIds = biomeIds;
-        threadArgs[i].startRow = i * rowsPerThread;
-        threadArgs[i].endRow = (i == NUM_THREADS - 1) ? r.sz : (i + 1) * rowsPerThread;
-        threadArgs[i].pix4cell = pix4cell;
-        threadArgs[i].sx = r.sx;
-        threadArgs[i].sz = r.sz;
-        pthread_create(&threads[i], NULL, biomesToImageParallel, (void *)&threadArgs[i]);
-    }
-
-    // Wait for all threads to complete
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
-    const char *dirUrl = "/var/www/production/gme-backend/storage/app/public/images/seeds";
-    // const char *dirUrl = "/var/www/staging/gme-backend/storage/app/public/images/seeds";
-    // const char *dirUrl = "/var/www/storage/app/public/images/seeds";
-
-    if (createDir(dirUrl) != 0) {
-        free(biomeIds);
-        free(rgb);
-        return 1;
-    }
-
-    char outputFile[256];
-    // snprintf(outputFile, sizeof(outputFile), "%s/seed_%lu.ppm", dirUrl, seed);
-    snprintf(outputFile, sizeof(outputFile), "%s/seed_%s%lld.ppm", dirUrl, (seed < 0 ? "-" : ""), llabs(seed));
-
-
-    if (savePPM(outputFile, rgb, imgWidth, imgHeight) != 0) {
-        fprintf(stderr, "Error saving PPM file\n");
-        free(biomeIds);
-        free(rgb);
-        return 1;
-    }
-
+    // Clean up.
     free(biomeIds);
     free(rgb);
-
-    printf("Biome map generated and saved to %s\n", outputFile);
 
     return 0;
 }
