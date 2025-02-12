@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     Generator g;
     setupGenerator(&g, MC_1_20, 0);
 
-    uint64_t worldSeed = (uint64_t) seed;
+    int64_t worldSeed = (int64_t) seed;
     applySeed(&g, DIM_OVERWORLD, worldSeed);
     
     //  0, 1,  2,  3,   4,   5, 
