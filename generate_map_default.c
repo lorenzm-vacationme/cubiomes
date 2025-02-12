@@ -5,13 +5,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 
 const int tileSize = 32; // Fixed tile size (32x32 blocks)
-const int numTiles = 100; // Number of tiles to generate
+const int numTiles = 500; // Number of tiles to generate
 
 // Function to calculate the number of tiles needed based on viewport size and tile size
 void calculateTileDimensions(int viewportWidth, int viewportHeight, int tileSize, int *tilesX, int *tilesY) {
@@ -22,7 +20,7 @@ void calculateTileDimensions(int viewportWidth, int viewportHeight, int tileSize
 int createDir(const char *path) {
     char tmp[2048];
     char *p;
-    
+
     // Copy the path to avoid modifying the original string
     snprintf(tmp, sizeof(tmp), "%s", path);
 
@@ -87,7 +85,7 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
     biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
 
     // Construct the directory path
-    char tileDir[4096];
+    char tileDir[2048];
     snprintf(tileDir, sizeof(tileDir), "%s/%lu", outputDir, seed);
 
     printf("Creating tile directory: %s\n", tileDir);
@@ -100,7 +98,7 @@ void generateTile(Generator *g, uint64_t seed, int tileX, int tileY, int tileSiz
     }
 
     // Construct the output file path
-    char outputFile[8096];
+    char outputFile[2048];
     snprintf(outputFile, sizeof(outputFile), "%s/%d_%d.png", tileDir, tileX, tileY);
 
     printf("Saving file to: %s\n", outputFile);
@@ -141,8 +139,7 @@ int main(int argc, char *argv[]) {
     uint64_t seed = strtoull(argv[1], NULL, 10);
 
     char outputDir[2048];
-    // snprintf(outputDir, sizeof(outputDir), "/var/www/storage/app/public/tiles");
-    snprintf(outputDir, sizeof(outputDir), "/var/www/gme-backend/storage/app/public/tiles");
+    snprintf(outputDir, sizeof(outputDir), "/var/www/storage/app/public/tiles");
 
     if (createDir(outputDir) != 0) {
         return 1;
