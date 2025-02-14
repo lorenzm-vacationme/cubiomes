@@ -132,7 +132,7 @@ static void parallelBiomesToImage(unsigned char *rgb,
 }
 
 static int createOutputPath(char *outputPath, size_t maxLen, int seed, int zoom, int x, int z) {
-    char basePath[] = "/var/www/storage/app/public/tiles";
+    char basePath[] = "/var/www/staging/gme-backend/storage/app/public/tiles";
     char tmpPath[MAX_PATH_LENGTH];
     
     // First create the directory path
