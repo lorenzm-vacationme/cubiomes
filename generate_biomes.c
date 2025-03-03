@@ -8,24 +8,6 @@
 #include "util.h"
 #include "image_utils.h"
 
-// Function to create directory if it doesn't exist
-void ensureDirectoryExists(const char *dirPath) {
-    struct stat st = {0};
-
-    if (stat(dirPath, &st) == -1) {
-        if (mkdir(dirPath, 0755) == -1) {
-            perror("Failed to create directory");
-            exit(1);
-        }
-        printf("Directory created: %s\n", dirPath);
-    }
-}
-
-// Function to check if a file exists
-int fileExists(const char *filePath) {
-    return access(filePath, F_OK) == 0;  // Returns 0 if file exists, -1 if not
-}
-
 int main(int argc, char *argv[])
 {
     if (argc < 3)
@@ -46,16 +28,8 @@ int main(int argc, char *argv[])
         basePath = "/var/www/storage/app/public/images/2d-map";
     }
 
-    ensureDirectoryExists(basePath);  // Ensure directory exists
-
     char filePath[512];
     snprintf(filePath, sizeof(filePath), "%s/2d-map_%ld.png", basePath, seed);
-
-    // Check if the image file already exists
-    if (fileExists(filePath)) {
-        printf("Image already exists: %s\n", filePath);
-        return 0;  // Skip generation if file is found
-    }
 
     printf("Generating and saving map to: %s\n", filePath);
 
