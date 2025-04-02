@@ -16,7 +16,7 @@
 #define PIXELS_PER_CELL 4
 #define CUBIOMES_SCALE 4
 #define DIR_PERMISSIONS 0777
-#define NUM_THREADS 2
+#define NUM_THREADS 3
 
 // Lookup table for zoom levels to tile sizes
 static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
@@ -132,7 +132,7 @@ static void parallelBiomesToImage(unsigned char *rgb,
 }
 
 static int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
-    char basePath[] = "/var/www/storage/app/public/tiles";
+    char basePath[] = "/var/www/production/gme-backend/storage/app/public/tiles";
     char tmpPath[MAX_PATH_LENGTH];
 
     int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%ld/%d/%d", basePath, seed, zoom, x);
