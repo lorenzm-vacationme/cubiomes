@@ -1,229 +1,3 @@
-// #include "generator.h"
-// #include "util.h"
-// #include "image_utils.h"
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <sys/stat.h>
-// #include <sys/types.h>
-// #include <errno.h>
-// #include <string.h>
-// #include <pthread.h>
-
-// #define MAX_PATH_LENGTH 512  // Increased from 256 to handle longer paths
-// #define DEFAULT_TILE_SIZE 16
-// #define PIXELS_PER_CELL 4
-// #define CUBIOMES_SCALE 4
-// #define DIR_PERMISSIONS 0777
-// #define NUM_THREADS 2
-
-// // Lookup table for zoom levels to tile sizes
-// static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
-// #define NUM_ZOOM_LEVELS (sizeof(ZOOM_TILE_SIZES) / sizeof(ZOOM_TILE_SIZES[0]))
-
-// static int getTileSize(int zoom) {
-//     if (zoom >= 0 && zoom < NUM_ZOOM_LEVELS) {
-//         return ZOOM_TILE_SIZES[zoom];
-//     }
-//     return DEFAULT_TILE_SIZE;
-// }
-
-// static int createSingleDirectory(const char *path) {
-//     if (mkdir(path, DIR_PERMISSIONS) != 0) {
-//         if (errno != EEXIST) {
-//             fprintf(stderr, "Error creating directory %s: %s\n", path, strerror(errno));
-//             return -1;
-//         }
-//     }
-//     return 0;
-// }
-
-// static int createDirectories(const char *path) {
-//     char tmp[MAX_PATH_LENGTH];
-//     char *p;
-    
-//     if (strlen(path) >= MAX_PATH_LENGTH) {
-//         fprintf(stderr, "Path too long\n");
-//         return -1;
-//     }
-    
-//     strncpy(tmp, path, MAX_PATH_LENGTH - 1);
-//     tmp[MAX_PATH_LENGTH - 1] = '\0';
-    
-//     for (p = tmp + 1; *p; p++) {
-//         if (*p == '/') {
-//             *p = '\0';
-//             if (createSingleDirectory(tmp) < 0) return -1;
-//             *p = '/';
-//         }
-//     }
-    
-//     return createSingleDirectory(tmp);
-// }
-
-// typedef struct {
-//     unsigned char *rgb;
-//     const int *biomeIds;
-//     const unsigned char (*biomeColors)[3];
-//     int startRow;
-//     int endRow;
-//     int width;
-//     int height;
-//     int pixelsPerCell;
-// } ThreadData;
-
-// static void *processChunk(void *arg) {
-//     ThreadData *data = (ThreadData *)arg;
-//     const int width = data->width;
-//     const int pixelsPerCell = data->pixelsPerCell;
-//     const int scaledWidth = width / pixelsPerCell;
-    
-//     for (int y = data->startRow; y < data->endRow; y++) {
-//         const int scaledY = y / pixelsPerCell;
-//         const int rowOffset = y * width;
-//         const int scaledRowOffset = scaledY * scaledWidth;
-        
-//         for (int x = 0; x < width; x++) {
-//             const int scaledX = x / pixelsPerCell;
-//             const int biomeIdx = scaledRowOffset + scaledX;
-//             const int pixelIdx = (rowOffset + x) * 3;
-            
-//             memcpy(&data->rgb[pixelIdx], 
-//                    data->biomeColors[data->biomeIds[biomeIdx]], 
-//                    3);
-//         }
-//     }
-    
-//     return NULL;
-// }
-
-// static void parallelBiomesToImage(unsigned char *rgb, 
-//                                 const unsigned char biomeColors[][3], 
-//                                 const int *biomeIds, 
-//                                 int width, int height, 
-//                                 int pixelsPerCell) {
-//     pthread_t threads[NUM_THREADS];
-//     ThreadData threadData[NUM_THREADS];
-    
-//     int rowsPerThread = height / NUM_THREADS;
-//     int remainingRows = height % NUM_THREADS;
-    
-//     int currentRow = 0;
-//     for (int i = 0; i < NUM_THREADS; i++) {
-//         threadData[i].rgb = rgb;
-//         threadData[i].biomeIds = biomeIds;
-//         threadData[i].biomeColors = biomeColors;
-//         threadData[i].width = width;
-//         threadData[i].height = height;
-//         threadData[i].pixelsPerCell = pixelsPerCell;
-//         threadData[i].startRow = currentRow;
-        
-//         threadData[i].endRow = currentRow + rowsPerThread;
-//         if (i < remainingRows) {
-//             threadData[i].endRow++;
-//         }
-//         currentRow = threadData[i].endRow;
-        
-//         pthread_create(&threads[i], NULL, processChunk, &threadData[i]);
-//     }
-    
-//     for (int i = 0; i < NUM_THREADS; i++) {
-//         pthread_join(threads[i], NULL);
-//     }
-// }
-
-// static int createOutputPath(char *outputPath, size_t maxLen, int seed, int zoom, int x, int z) {
-//     char basePath[] = "/var/www/storage/app/public/tiles";
-//     char tmpPath[MAX_PATH_LENGTH];
-    
-//     // First create the directory path
-//     int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%d/%d/%d", 
-//                          basePath, seed, zoom, x);
-//     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
-//         return -1;
-//     }
-    
-//     // Create the directories
-//     if (createDirectories(tmpPath) < 0) {
-//         return -1;
-// }
-    
-//     // Then create the full file path
-//     int fullLen = snprintf(outputPath, maxLen, "%s/%d.png", tmpPath, z);
-//     if (fullLen < 0 || fullLen >= maxLen) {
-//         return -1;
-//     }
-    
-//     return 0;
-// }
-
-// int main(int argc, char *argv[]) {
-//     if (argc < 5) {
-//         fprintf(stderr, "Usage: %s <seed> <zoom> <x> <z>\n", argv[0]);
-//         return 1;
-//     }
-
-//     int seed = atoi(argv[1]);
-//     int zoom = atoi(argv[2]);
-//     int x = atoi(argv[3]);
-//     int z = atoi(argv[4]);
-
-//     Generator g;
-//     setupGenerator(&g, MC_1_20, 0);
-//     applySeed(&g, DIM_OVERWORLD, (int64_t)seed);
-
-//     int tileSize = getTileSize(zoom);
-//     int imgWidth = tileSize * PIXELS_PER_CELL;
-//     int imgHeight = tileSize * PIXELS_PER_CELL;
-
-//     Range r = {
-//         .scale = CUBIOMES_SCALE,
-//         .x = x * tileSize,
-//         .z = z * tileSize,
-//         .sx = tileSize,
-//         .sz = tileSize,
-//         .y = 15,
-//         .sy = 1
-//     };
-
-//     int *biomeIds = malloc(sizeof(int) * r.sx * r.sz);
-//     if (!biomeIds) {
-//         fprintf(stderr, "Failed to allocate biome cache\n");
-//         return 1;
-//     }
-
-//     unsigned char *rgb = malloc(3 * imgWidth * imgHeight);
-//     if (!rgb) {
-//         fprintf(stderr, "Failed to allocate RGB buffer\n");
-//         free(biomeIds);
-//         return 1;
-//     }
-
-//     genBiomes(&g, biomeIds, r);
-
-//     unsigned char biomeColors[256][3];
-//     initBiomeColors(biomeColors);
-//     parallelBiomesToImage(rgb, biomeColors, biomeIds, imgWidth, imgHeight, PIXELS_PER_CELL);
-
-//     char outputPath[MAX_PATH_LENGTH];
-//     if (createOutputPath(outputPath, sizeof(outputPath), seed, zoom, x, z) < 0) {
-//         fprintf(stderr, "Failed to create output path\n");
-//         free(biomeIds);
-//         free(rgb);
-//         return 1;
-//     }
-    
-//     if (savePNG(outputPath, rgb, imgWidth, imgHeight) != 0) {
-//         fprintf(stderr, "Error saving image %s: %s\n", outputPath, strerror(errno));
-//         free(biomeIds);
-//         free(rgb);
-//         return 1;
-//     }
-
-//     printf("Saved: %s\n", outputPath);
-//     free(biomeIds);
-//     free(rgb);
-//     return 0;
-// }
 #include "generator.h"
 #include "util.h"
 #include "image_utils.h"
@@ -234,42 +8,57 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
-#include <stdbool.h>
-#include <time.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <inttypes.h>
-#include <limits.h>
-#include <sys/sysinfo.h>
-#include <fcntl.h>  // For file locking
 
-#define MAX_PATH_LENGTH 512
+#define MAX_PATH_LENGTH 512  // Increased from 256 to handle longer paths
 #define DEFAULT_TILE_SIZE 16
 #define PIXELS_PER_CELL 4
 #define CUBIOMES_SCALE 4
 #define DIR_PERMISSIONS 0777
-#define CACHE_SIZE 100             // Increased from 50 to 100
-#define MAX_SEED_LENGTH 19
-#define MAX_LOAD_AVERAGE 4.0       // Set to match core count 
-#define WORK_DELAY_US 5000         // Moderate delay - not too aggressive
-#define MAX_THREADS 4              // Match your CPU core count
+#define NUM_THREADS 2
 
-// Timeout settings
-#define THREAD_WAIT_TIMEOUT_MS 250 // 250ms wait timeout
-#define TILE_GENERATION_TIMEOUT 20.0 // 20 seconds max for tile generation
+// Lookup table for zoom levels to tile sizes
+static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
+#define NUM_ZOOM_LEVELS (sizeof(ZOOM_TILE_SIZES) / sizeof(ZOOM_TILE_SIZES[0]))
 
-// Lock file for synchronizing between processes
-#define LOCK_FILE "/tmp/tile_generator.lock"
+static int getTileSize(int zoom) {
+    if (zoom >= 0 && zoom < NUM_ZOOM_LEVELS) {
+        return ZOOM_TILE_SIZES[zoom];
+    }
+    return DEFAULT_TILE_SIZE;
+}
 
-typedef struct {
-    int64_t seed;
-    int zoom;
-    int x;
-    int z;
-    unsigned char* image;
-    size_t size;
-    time_t last_accessed;
-} TileCache;
+static int createSingleDirectory(const char *path) {
+    if (mkdir(path, DIR_PERMISSIONS) != 0) {
+        if (errno != EEXIST) {
+            fprintf(stderr, "Error creating directory %s: %s\n", path, strerror(errno));
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int createDirectories(const char *path) {
+    char tmp[MAX_PATH_LENGTH];
+    char *p;
+    
+    if (strlen(path) >= MAX_PATH_LENGTH) {
+        fprintf(stderr, "Path too long\n");
+        return -1;
+    }
+    
+    strncpy(tmp, path, MAX_PATH_LENGTH - 1);
+    tmp[MAX_PATH_LENGTH - 1] = '\0';
+    
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (createSingleDirectory(tmp) < 0) return -1;
+            *p = '/';
+        }
+    }
+    
+    return createSingleDirectory(tmp);
+}
 
 typedef struct {
     unsigned char *rgb;
@@ -280,521 +69,733 @@ typedef struct {
     int width;
     int height;
     int pixelsPerCell;
-    bool done;
-} WorkItem;
+} ThreadData;
 
-typedef struct {
-    pthread_t threads[MAX_THREADS];
-    bool running;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    WorkItem work[MAX_THREADS];
-    TileCache cache[CACHE_SIZE];
-    int cache_index;
-    int *biome_cache;
-    unsigned char *rgb_buffer;
-    unsigned char biome_colors[256][3];
-    int num_threads;
-    int active_jobs;
-    int total_jobs;
-} ThreadPool;
-
-static ThreadPool thread_pool;
-
-// File locking helpers
-static int acquire_lock() {
-    int fd = open(LOCK_FILE, O_RDWR | O_CREAT, 0666);
-    if (fd == -1) return -1;
+static void *processChunk(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    const int width = data->width;
+    const int pixelsPerCell = data->pixelsPerCell;
+    const int scaledWidth = width / pixelsPerCell;
     
-    struct flock lock;
-    lock.l_type = F_WRLCK;
-    lock.l_whence = SEEK_SET;
-    lock.l_start = 0;
-    lock.l_len = 0;
+    for (int y = data->startRow; y < data->endRow; y++) {
+        const int scaledY = y / pixelsPerCell;
+        const int rowOffset = y * width;
+        const int scaledRowOffset = scaledY * scaledWidth;
+        
+        for (int x = 0; x < width; x++) {
+            const int scaledX = x / pixelsPerCell;
+            const int biomeIdx = scaledRowOffset + scaledX;
+            const int pixelIdx = (rowOffset + x) * 3;
+            
+            memcpy(&data->rgb[pixelIdx], 
+                   data->biomeColors[data->biomeIds[biomeIdx]], 
+                   3);
+        }
+    }
     
-    if (fcntl(fd, F_SETLK, &lock) == -1) {
-        close(fd);
+    return NULL;
+}
+
+static void parallelBiomesToImage(unsigned char *rgb, 
+                                const unsigned char biomeColors[][3], 
+                                const int *biomeIds, 
+                                int width, int height, 
+                                int pixelsPerCell) {
+    pthread_t threads[NUM_THREADS];
+    ThreadData threadData[NUM_THREADS];
+    
+    int rowsPerThread = height / NUM_THREADS;
+    int remainingRows = height % NUM_THREADS;
+    
+    int currentRow = 0;
+    for (int i = 0; i < NUM_THREADS; i++) {
+        threadData[i].rgb = rgb;
+        threadData[i].biomeIds = biomeIds;
+        threadData[i].biomeColors = biomeColors;
+        threadData[i].width = width;
+        threadData[i].height = height;
+        threadData[i].pixelsPerCell = pixelsPerCell;
+        threadData[i].startRow = currentRow;
+        
+        threadData[i].endRow = currentRow + rowsPerThread;
+        if (i < remainingRows) {
+            threadData[i].endRow++;
+        }
+        currentRow = threadData[i].endRow;
+        
+        pthread_create(&threads[i], NULL, processChunk, &threadData[i]);
+    }
+    
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
+
+static int createOutputPath(char *outputPath, size_t maxLen, int seed, int zoom, int x, int z) {
+    char basePath[] = "/var/www/storage/app/public/tiles";
+    char tmpPath[MAX_PATH_LENGTH];
+    
+    // First create the directory path
+    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%d/%d/%d", 
+                         basePath, seed, zoom, x);
+    if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
         return -1;
     }
     
-    return fd;
+    // Create the directories
+    if (createDirectories(tmpPath) < 0) {
+        return -1;
+}
+    
+    // Then create the full file path
+    int fullLen = snprintf(outputPath, maxLen, "%s/%d.png", tmpPath, z);
+    if (fullLen < 0 || fullLen >= maxLen) {
+        return -1;
+    }
+    
+    return 0;
 }
 
-static void release_lock(int fd) {
-    if (fd >= 0) {
-        struct flock lock;
-        lock.l_type = F_UNLCK;
-        lock.l_whence = SEEK_SET;
-        lock.l_start = 0;
-        lock.l_len = 0;
-        
-        fcntl(fd, F_SETLK, &lock);
-        close(fd);
-    }
-}
-
-static bool isValidSeed(const char *str) {
-    if (!str || !*str) return false;
-    size_t len = strlen(str);
-    if (len > MAX_SEED_LENGTH + 1) return false;
-    
-    const char *p = str;
-    if (*p == '-' || *p == '+') p++;
-    if (!*p) return false;
-    
-    while (*p) {
-        if (!isdigit(*p++)) return false;
-    }
-    return true;
-}
-
-static int getTileSize(int zoom) {
-    static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
-    static const int NUM_ZOOM_LEVELS = sizeof(ZOOM_TILE_SIZES) / sizeof(ZOOM_TILE_SIZES[0]);
-    
-    return (zoom >= 0 && zoom < NUM_ZOOM_LEVELS) ? ZOOM_TILE_SIZES[zoom] : DEFAULT_TILE_SIZE;
-}
-
-static int createDirectory(const char *path) {
-    char tmp[MAX_PATH_LENGTH];
-    strncpy(tmp, path, MAX_PATH_LENGTH - 1);
-    tmp[MAX_PATH_LENGTH - 1] = '\0';
-
-    for (char *p = tmp + 1; *p; p++) {
-        if (*p == '/') {
-            *p = '\0';
-            if (mkdir(tmp, DIR_PERMISSIONS) && errno != EEXIST) {
-                fprintf(stderr, "Error creating directory %s: %s\n", tmp, strerror(errno));
-                return -1;
-            }
-            *p = '/';
-        }
-    }
-    return mkdir(tmp, DIR_PERMISSIONS) && errno != EEXIST ? -1 : 0;
-}
-
-static void* workerThread(void* arg) {
-    int thread_id = *(int*)arg;
-    free(arg);
-    
-    while (thread_pool.running) {
-        pthread_mutex_lock(&thread_pool.mutex);
-        
-        // Use a more reasonable timeout
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_nsec += THREAD_WAIT_TIMEOUT_MS * 1000000; // Convert ms to ns
-        if (ts.tv_nsec >= 1000000000) {
-            ts.tv_sec += ts.tv_nsec / 1000000000;
-            ts.tv_nsec %= 1000000000;
-        }
-        
-        // Check if our work item is ready and not done
-        bool work_found = false;
-        if (thread_pool.work[thread_id].rgb != NULL && !thread_pool.work[thread_id].done) {
-            work_found = true;
-        }
-        
-        if (!work_found) {
-            pthread_cond_timedwait(&thread_pool.cond, &thread_pool.mutex, &ts);
-            pthread_mutex_unlock(&thread_pool.mutex);
-            continue;
-        }
-        
-        pthread_mutex_unlock(&thread_pool.mutex);
-        
-        // Process the work item
-        WorkItem* work = &thread_pool.work[thread_id];
-        const int width = work->width;
-        const int ppc = work->pixelsPerCell;
-        const int scaled_width = width / ppc;
-        
-        for (int y = work->startRow; y < work->endRow && thread_pool.running; y++) {
-            const int scaled_y = y / ppc;
-            const int row_offset = y * width;
-            const int scaled_row_offset = scaled_y * scaled_width;
-            
-            for (int x = 0; x < width; x++) {
-                const int scaled_x = x / ppc;
-                const int biome_idx = scaled_row_offset + scaled_x;
-                const int pixel_idx = (row_offset + x) * 3;
-                
-                memcpy(&work->rgb[pixel_idx], work->biomeColors[work->biomeIds[biome_idx]], 3);
-            }
-        }
-        
-        pthread_mutex_lock(&thread_pool.mutex);
-        work->done = true;
-        thread_pool.active_jobs--;
-        pthread_cond_broadcast(&thread_pool.cond);  // Signal completion
-        pthread_mutex_unlock(&thread_pool.mutex);
-    }
-    return NULL;
-}
-
-static bool checkSystemLoad() {
-    double loadavg[1];
-    if (getloadavg(loadavg, 1) == -1) {
-        fprintf(stderr, "Warning: Could not get system load\n");
-        return true;
-    }
-    
-    // Check if we're already handling lots of jobs
-    pthread_mutex_lock(&thread_pool.mutex);
-    int current_jobs = thread_pool.active_jobs;
-    pthread_mutex_unlock(&thread_pool.mutex);
-    
-    // Consider both system load and our own active jobs
-    if (loadavg[0] > MAX_LOAD_AVERAGE || current_jobs > thread_pool.num_threads) {
-        fprintf(stderr, "System busy: load=%.2f, active_jobs=%d, waiting...\n", 
-                loadavg[0], current_jobs);
-        usleep(250000);  // Wait 250ms
-        return false;
-    }
-    return true;
-}
-
-static bool fileExists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0;
-}
-
-static unsigned char* checkCache(int64_t seed, int zoom, int x, int z, size_t* size) {
-    time_t now = time(NULL);
-    for (int i = 0; i < CACHE_SIZE; i++) {
-        if (thread_pool.cache[i].seed == seed && 
-            thread_pool.cache[i].zoom == zoom && 
-            thread_pool.cache[i].x == x && 
-            thread_pool.cache[i].z == z) {
-            thread_pool.cache[i].last_accessed = now;
-            *size = thread_pool.cache[i].size;
-            return thread_pool.cache[i].image;
-        }
-    }
-    return NULL;
-}
-
-static void addToCache(int64_t seed, int zoom, int x, int z, unsigned char* image, size_t size) {
-    if (!image) return;
-    
-    time_t now = time(NULL);
-    time_t oldest = now;
-    int oldest_index = thread_pool.cache_index;
-
-    // Check if we already have this tile
-    for (int i = 0; i < CACHE_SIZE; i++) {
-        if (thread_pool.cache[i].seed == seed && 
-            thread_pool.cache[i].zoom == zoom && 
-            thread_pool.cache[i].x == x && 
-            thread_pool.cache[i].z == z) {
-            free(thread_pool.cache[i].image);
-            thread_pool.cache[i].image = image;
-            thread_pool.cache[i].size = size;
-            thread_pool.cache[i].last_accessed = now;
-            return;
-        }
-        if (thread_pool.cache[i].last_accessed < oldest) {
-            oldest = thread_pool.cache[i].last_accessed;
-            oldest_index = i;
-        }
-    }
-
-    // Free any existing image in the slot we're going to use
-    free(thread_pool.cache[oldest_index].image);
-    
-    // Store the new cached tile
-    thread_pool.cache[oldest_index].seed = seed;
-    thread_pool.cache[oldest_index].zoom = zoom;
-    thread_pool.cache[oldest_index].x = x;
-    thread_pool.cache[oldest_index].z = z;
-    thread_pool.cache[oldest_index].image = image;
-    thread_pool.cache[oldest_index].size = size;
-    thread_pool.cache[oldest_index].last_accessed = now;
-    
-    // Move index to next slot for round-robin caching
-    thread_pool.cache_index = (oldest_index + 1) % CACHE_SIZE;
-}
-
-static int createOutputPath(char *output, size_t max_len, int64_t seed, int zoom, int x, int z) {
-    char dir[MAX_PATH_LENGTH];
-    int len = snprintf(dir, sizeof(dir), "/var/www/production/gme-backend/storage/app/public/tiles/%" PRId64 "/%d/%d", seed, zoom, x);
-    if (len < 0 || len >= sizeof(dir)) return -1;
-    
-    if (createDirectory(dir)) return -1;
-    
-    len = snprintf(output, max_len, "%s/%d.png", dir, z);
-    return (len < 0 || len >= max_len) ? -1 : 0;
-}
-
-static void initialize() {
-    int cores = get_nprocs();
-    thread_pool.num_threads = (cores > 2) ? cores - 1 : 1;
-    if (thread_pool.num_threads > MAX_THREADS) {
-        thread_pool.num_threads = MAX_THREADS;
-    }
-
-    printf("Initializing with %d threads (system has %d cores)\n", thread_pool.num_threads, cores);
-    
-    // Calculate buffer sizes based on largest possible tile
-    size_t max_tile = 256; // Largest zoom level
-    size_t max_img = max_tile * PIXELS_PER_CELL;
-    size_t max_biome = max_tile * max_tile * sizeof(int);
-    size_t max_rgb = 3 * max_img * max_img;
-    
-    thread_pool.biome_cache = malloc(max_biome);
-    thread_pool.rgb_buffer = malloc(max_rgb);
-    if (!thread_pool.biome_cache || !thread_pool.rgb_buffer) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(1);
-    }
-    
-    pthread_mutex_init(&thread_pool.mutex, NULL);
-    pthread_cond_init(&thread_pool.cond, NULL);
-    thread_pool.running = true;
-    thread_pool.active_jobs = 0;
-    thread_pool.total_jobs = 0;
-    
-    for (int i = 0; i < thread_pool.num_threads; i++) {
-        int* id = malloc(sizeof(int));
-        if (id == NULL) {
-            fprintf(stderr, "Memory allocation failed for thread ID\n");
-            continue;
-        }
-        *id = i;
-        if (pthread_create(&thread_pool.threads[i], NULL, workerThread, id)) {
-            fprintf(stderr, "Thread creation failed\n");
-            free(id);
-            continue;
-        }
-    }
-    
-    initBiomeColors(thread_pool.biome_colors);
-    memset(thread_pool.cache, 0, sizeof(thread_pool.cache));
-    thread_pool.cache_index = 0;
-}
-
-static void cleanup() {
-    thread_pool.running = false;
-    pthread_cond_broadcast(&thread_pool.cond);
-    
-    for (int i = 0; i < thread_pool.num_threads; i++) {
-        pthread_join(thread_pool.threads[i], NULL);
-    }
-    
-    pthread_mutex_destroy(&thread_pool.mutex);
-    pthread_cond_destroy(&thread_pool.cond);
-    
-    free(thread_pool.biome_cache);
-    free(thread_pool.rgb_buffer);
-    
-    for (int i = 0; i < CACHE_SIZE; i++) {
-        free(thread_pool.cache[i].image);
-    }
-}
-
-static int generateTile(int64_t seed, int zoom, int x, int z) {
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    
-    // Check if file already exists on disk
-    char path[MAX_PATH_LENGTH];
-    if (createOutputPath(path, sizeof(path), seed, zoom, x, z) == 0 && fileExists(path)) {
-        printf("Tile already exists: %" PRId64 "/%d/%d/%d\n", seed, zoom, x, z);
-        return 0;  // File exists, no need to regenerate
-    }
-    
-    // Get lock to ensure we don't have multiple processes generating the same tile
-    int lock_fd = acquire_lock();
-    if (lock_fd < 0) {
-        fprintf(stderr, "Another process is already generating tiles, waiting...\n");
-        sleep(1);
-        return 1;  // Temporary failure, caller can retry
-    }
-    
-    // Check memory cache
-    size_t cached_size;
-    unsigned char* cached = checkCache(seed, zoom, x, z, &cached_size);
-    if (cached) {
-        if (createOutputPath(path, sizeof(path), seed, zoom, x, z) == 0) {
-            int size = sqrt(cached_size/3);
-            if (savePNG(path, cached, size, size) == 0) {
-                clock_gettime(CLOCK_MONOTONIC, &end);
-                double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-                printf("Cached tile %" PRId64 "/%d/%d/%d (%.3fs)\n", seed, zoom, x, z, elapsed);
-                release_lock(lock_fd);
-                return 0;
-            }
-        }
-    }
-
-    // Wait until system load is reasonable
-    int wait_count = 0;
-    const int max_waits = 5;  // Maximum number of times to check load
-    while (!checkSystemLoad() && wait_count < max_waits) {
-        wait_count++;
-    }
-    
-    if (wait_count >= max_waits) {
-        fprintf(stderr, "System too busy, skipping tile %" PRId64 "/%d/%d/%d\n", seed, zoom, x, z);
-        release_lock(lock_fd);
+int main(int argc, char *argv[]) {
+    if (argc < 5) {
+        fprintf(stderr, "Usage: %s <seed> <zoom> <x> <z>\n", argv[0]);
         return 1;
     }
 
+    int seed = atoi(argv[1]);
+    int zoom = atoi(argv[2]);
+    int x = atoi(argv[3]);
+    int z = atoi(argv[4]);
+
     Generator g;
     setupGenerator(&g, MC_1_20, 0);
-    applySeed(&g, DIM_OVERWORLD, seed);
+    applySeed(&g, DIM_OVERWORLD, (int64_t)seed);
 
-    int tile_size = getTileSize(zoom);
-    int width = tile_size * PIXELS_PER_CELL;
-    int height = tile_size * PIXELS_PER_CELL;
+    int tileSize = getTileSize(zoom);
+    int imgWidth = tileSize * PIXELS_PER_CELL;
+    int imgHeight = tileSize * PIXELS_PER_CELL;
 
     Range r = {
         .scale = CUBIOMES_SCALE,
-        .x = x * tile_size,
-        .z = z * tile_size,
-        .sx = tile_size,
-        .sz = tile_size,
+        .x = x * tileSize,
+        .z = z * tileSize,
+        .sx = tileSize,
+        .sz = tileSize,
         .y = 15,
         .sy = 1
     };
 
-    // Generate biome data
-    genBiomes(&g, thread_pool.biome_cache, r);
-    
-    // Distribute work among threads
-    pthread_mutex_lock(&thread_pool.mutex);
-    thread_pool.active_jobs = thread_pool.num_threads;
-    thread_pool.total_jobs++;
-    
-    int rows_per_thread = height / thread_pool.num_threads;
-    int remaining = height % thread_pool.num_threads;
-    int current_row = 0;
-    
-    for (int i = 0; i < thread_pool.num_threads; i++) {
-        thread_pool.work[i].rgb = thread_pool.rgb_buffer;
-        thread_pool.work[i].biomeIds = thread_pool.biome_cache;
-        thread_pool.work[i].biomeColors = thread_pool.biome_colors;
-        thread_pool.work[i].width = width;
-        thread_pool.work[i].height = height;
-        thread_pool.work[i].pixelsPerCell = PIXELS_PER_CELL;
-        thread_pool.work[i].startRow = current_row;
-        thread_pool.work[i].endRow = current_row + rows_per_thread + (i < remaining ? 1 : 0);
-        thread_pool.work[i].done = false;
-        current_row = thread_pool.work[i].endRow;
+    int *biomeIds = malloc(sizeof(int) * r.sx * r.sz);
+    if (!biomeIds) {
+        fprintf(stderr, "Failed to allocate biome cache\n");
+        return 1;
+    }
+
+    unsigned char *rgb = malloc(3 * imgWidth * imgHeight);
+    if (!rgb) {
+        fprintf(stderr, "Failed to allocate RGB buffer\n");
+        free(biomeIds);
+        return 1;
+    }
+
+    genBiomes(&g, biomeIds, r);
+
+    unsigned char biomeColors[256][3];
+    initBiomeColors(biomeColors);
+    parallelBiomesToImage(rgb, biomeColors, biomeIds, imgWidth, imgHeight, PIXELS_PER_CELL);
+
+    char outputPath[MAX_PATH_LENGTH];
+    if (createOutputPath(outputPath, sizeof(outputPath), seed, zoom, x, z) < 0) {
+        fprintf(stderr, "Failed to create output path\n");
+        free(biomeIds);
+        free(rgb);
+        return 1;
     }
     
-    pthread_cond_broadcast(&thread_pool.cond);
-    
-    // Wait for all threads to complete with timeout
-    struct timespec timeout_start, timeout_now;
-    clock_gettime(CLOCK_MONOTONIC, &timeout_start);
-    
-    bool complete = false;
-    while (!complete) {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_nsec += 100 * 1000000; // 100ms
-        if (ts.tv_nsec >= 1000000000) {
-            ts.tv_sec += 1;
-            ts.tv_nsec -= 1000000000;
-        }
-        
-        if (pthread_cond_timedwait(&thread_pool.cond, &thread_pool.mutex, &ts) == ETIMEDOUT) {
-            // Check if we've timed out
-            clock_gettime(CLOCK_MONOTONIC, &timeout_now);
-            double elapsed = (timeout_now.tv_sec - timeout_start.tv_sec) + 
-                             (timeout_now.tv_nsec - timeout_start.tv_nsec) / 1e9;
-                             
-            if (elapsed > TILE_GENERATION_TIMEOUT) {
-                fprintf(stderr, "Timeout generating tile %" PRId64 "/%d/%d/%d after %.1f seconds\n", 
-                        seed, zoom, x, z, elapsed);
-                        
-                // Reset the work items
-                for (int i = 0; i < thread_pool.num_threads; i++) {
-                    thread_pool.work[i].rgb = NULL;
-                    thread_pool.work[i].done = true;
-                }
-                thread_pool.active_jobs = 0;
-                pthread_mutex_unlock(&thread_pool.mutex);
-                release_lock(lock_fd);
-                return 1;
-            }
-        }
-        
-        // Check if all work is complete
-        complete = (thread_pool.active_jobs == 0);
-        if (complete) {
-            break;
-        }
+    if (savePNG(outputPath, rgb, imgWidth, imgHeight) != 0) {
+        fprintf(stderr, "Error saving image %s: %s\n", outputPath, strerror(errno));
+        free(biomeIds);
+        free(rgb);
+        return 1;
     }
-    
-    pthread_mutex_unlock(&thread_pool.mutex);
-    
-    // Save the generated image
-    if (createOutputPath(path, sizeof(path), seed, zoom, x, z) == 0) {
-        if (savePNG(path, thread_pool.rgb_buffer, width, height) == 0) {
-            // Cache the generated tile
-            size_t img_size = width * height * 3;
-            unsigned char* copy = malloc(img_size);
-            if (copy) {
-                memcpy(copy, thread_pool.rgb_buffer, img_size);
-                addToCache(seed, zoom, x, z, copy, img_size);
-            }
-            
-            clock_gettime(CLOCK_MONOTONIC, &end);
-            double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-            printf("Generated tile %" PRId64 "/%d/%d/%d (%.3fs)\n", seed, zoom, x, z, elapsed);
-            release_lock(lock_fd);
-            return 0;
-        }
-    }
-    
-    release_lock(lock_fd);
-    return 1;
+
+    printf("Saved: %s\n", outputPath);
+    free(biomeIds);
+    free(rgb);
+    return 0;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 5 || (argc-1) % 4 != 0) {
-        fprintf(stderr, "Usage: %s <seed> <zoom1> <x1> <z1> [<zoom2> <x2> <z2> ...]\n", argv[0]);
-        return 1;
-    }
+// #include "generator.h"
+// #include "util.h"
+// #include "image_utils.h"
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <sys/stat.h>
+// #include <sys/types.h>
+// #include <errno.h>
+// #include <string.h>
+// #include <pthread.h>
+// #include <stdbool.h>
+// #include <time.h>
+// #include <unistd.h>
+// #include <ctype.h>
+// #include <inttypes.h>
+// #include <limits.h>
+// #include <sys/sysinfo.h>
+// #include <fcntl.h>  // For file locking
+
+// #define MAX_PATH_LENGTH 512
+// #define DEFAULT_TILE_SIZE 16
+// #define PIXELS_PER_CELL 4
+// #define CUBIOMES_SCALE 4
+// #define DIR_PERMISSIONS 0777
+// #define CACHE_SIZE 100             // Increased from 50 to 100
+// #define MAX_SEED_LENGTH 19
+// #define MAX_LOAD_AVERAGE 4.0       // Set to match core count 
+// #define WORK_DELAY_US 5000         // Moderate delay - not too aggressive
+// #define MAX_THREADS 4              // Match your CPU core count
+
+// // Timeout settings
+// #define THREAD_WAIT_TIMEOUT_MS 250 // 250ms wait timeout
+// #define TILE_GENERATION_TIMEOUT 20.0 // 20 seconds max for tile generation
+
+// // Lock file for synchronizing between processes
+// #define LOCK_FILE "/tmp/tile_generator.lock"
+
+// typedef struct {
+//     int64_t seed;
+//     int zoom;
+//     int x;
+//     int z;
+//     unsigned char* image;
+//     size_t size;
+//     time_t last_accessed;
+// } TileCache;
+
+// typedef struct {
+//     unsigned char *rgb;
+//     const int *biomeIds;
+//     const unsigned char (*biomeColors)[3];
+//     int startRow;
+//     int endRow;
+//     int width;
+//     int height;
+//     int pixelsPerCell;
+//     bool done;
+// } WorkItem;
+
+// typedef struct {
+//     pthread_t threads[MAX_THREADS];
+//     bool running;
+//     pthread_mutex_t mutex;
+//     pthread_cond_t cond;
+//     WorkItem work[MAX_THREADS];
+//     TileCache cache[CACHE_SIZE];
+//     int cache_index;
+//     int *biome_cache;
+//     unsigned char *rgb_buffer;
+//     unsigned char biome_colors[256][3];
+//     int num_threads;
+//     int active_jobs;
+//     int total_jobs;
+// } ThreadPool;
+
+// static ThreadPool thread_pool;
+
+// // File locking helpers
+// static int acquire_lock() {
+//     int fd = open(LOCK_FILE, O_RDWR | O_CREAT, 0666);
+//     if (fd == -1) return -1;
     
-    if (!isValidSeed(argv[1])) {
-        fprintf(stderr, "Invalid seed (max %d digits)\n", MAX_SEED_LENGTH);
-        return 1;
-    }
+//     struct flock lock;
+//     lock.l_type = F_WRLCK;
+//     lock.l_whence = SEEK_SET;
+//     lock.l_start = 0;
+//     lock.l_len = 0;
     
-    char *end;
-    int64_t seed = strtoll(argv[1], &end, 10);
-    if (*end || seed == LLONG_MIN || seed == LLONG_MAX) {
-        fprintf(stderr, "Seed out of range\n");
-        return 1;
-    }
+//     if (fcntl(fd, F_SETLK, &lock) == -1) {
+//         close(fd);
+//         return -1;
+//     }
     
-    initialize();
-    int result = 0;
-    int retries = 0;
-    const int max_retries = 3;
-    
-    for (int i = 1; i < argc; i += 4) {
-        int zoom = atoi(argv[i+1]);
-        int x = atoi(argv[i+2]);
-        int z = atoi(argv[i+3]);
+//     return fd;
+// }
+
+// static void release_lock(int fd) {
+//     if (fd >= 0) {
+//         struct flock lock;
+//         lock.l_type = F_UNLCK;
+//         lock.l_whence = SEEK_SET;
+//         lock.l_start = 0;
+//         lock.l_len = 0;
         
-        retries = 0;
-        while (generateTile(seed, zoom, x, z) != 0 && retries < max_retries) {
-            retries++;
-            fprintf(stderr, "Retry %d for tile %" PRId64 "/%d/%d/%d\n", retries, seed, zoom, x, z);
-            usleep(500000 * retries); // Progressive backoff
-        }
-        
-        if (retries >= max_retries) {
-            fprintf(stderr, "Failed to generate tile %" PRId64 "/%d/%d/%d after %d attempts\n", 
-                    seed, zoom, x, z, retries);
-            result = 1;
-        }
-    }
+//         fcntl(fd, F_SETLK, &lock);
+//         close(fd);
+//     }
+// }
+
+// static bool isValidSeed(const char *str) {
+//     if (!str || !*str) return false;
+//     size_t len = strlen(str);
+//     if (len > MAX_SEED_LENGTH + 1) return false;
     
-    cleanup();
-    return result;
-}
+//     const char *p = str;
+//     if (*p == '-' || *p == '+') p++;
+//     if (!*p) return false;
+    
+//     while (*p) {
+//         if (!isdigit(*p++)) return false;
+//     }
+//     return true;
+// }
+
+// static int getTileSize(int zoom) {
+//     static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
+//     static const int NUM_ZOOM_LEVELS = sizeof(ZOOM_TILE_SIZES) / sizeof(ZOOM_TILE_SIZES[0]);
+    
+//     return (zoom >= 0 && zoom < NUM_ZOOM_LEVELS) ? ZOOM_TILE_SIZES[zoom] : DEFAULT_TILE_SIZE;
+// }
+
+// static int createDirectory(const char *path) {
+//     char tmp[MAX_PATH_LENGTH];
+//     strncpy(tmp, path, MAX_PATH_LENGTH - 1);
+//     tmp[MAX_PATH_LENGTH - 1] = '\0';
+
+//     for (char *p = tmp + 1; *p; p++) {
+//         if (*p == '/') {
+//             *p = '\0';
+//             if (mkdir(tmp, DIR_PERMISSIONS) && errno != EEXIST) {
+//                 fprintf(stderr, "Error creating directory %s: %s\n", tmp, strerror(errno));
+//                 return -1;
+//             }
+//             *p = '/';
+//         }
+//     }
+//     return mkdir(tmp, DIR_PERMISSIONS) && errno != EEXIST ? -1 : 0;
+// }
+
+// static void* workerThread(void* arg) {
+//     int thread_id = *(int*)arg;
+//     free(arg);
+    
+//     while (thread_pool.running) {
+//         pthread_mutex_lock(&thread_pool.mutex);
+        
+//         // Use a more reasonable timeout
+//         struct timespec ts;
+//         clock_gettime(CLOCK_REALTIME, &ts);
+//         ts.tv_nsec += THREAD_WAIT_TIMEOUT_MS * 1000000; // Convert ms to ns
+//         if (ts.tv_nsec >= 1000000000) {
+//             ts.tv_sec += ts.tv_nsec / 1000000000;
+//             ts.tv_nsec %= 1000000000;
+//         }
+        
+//         // Check if our work item is ready and not done
+//         bool work_found = false;
+//         if (thread_pool.work[thread_id].rgb != NULL && !thread_pool.work[thread_id].done) {
+//             work_found = true;
+//         }
+        
+//         if (!work_found) {
+//             pthread_cond_timedwait(&thread_pool.cond, &thread_pool.mutex, &ts);
+//             pthread_mutex_unlock(&thread_pool.mutex);
+//             continue;
+//         }
+        
+//         pthread_mutex_unlock(&thread_pool.mutex);
+        
+//         // Process the work item
+//         WorkItem* work = &thread_pool.work[thread_id];
+//         const int width = work->width;
+//         const int ppc = work->pixelsPerCell;
+//         const int scaled_width = width / ppc;
+        
+//         for (int y = work->startRow; y < work->endRow && thread_pool.running; y++) {
+//             const int scaled_y = y / ppc;
+//             const int row_offset = y * width;
+//             const int scaled_row_offset = scaled_y * scaled_width;
+            
+//             for (int x = 0; x < width; x++) {
+//                 const int scaled_x = x / ppc;
+//                 const int biome_idx = scaled_row_offset + scaled_x;
+//                 const int pixel_idx = (row_offset + x) * 3;
+                
+//                 memcpy(&work->rgb[pixel_idx], work->biomeColors[work->biomeIds[biome_idx]], 3);
+//             }
+//         }
+        
+//         pthread_mutex_lock(&thread_pool.mutex);
+//         work->done = true;
+//         thread_pool.active_jobs--;
+//         pthread_cond_broadcast(&thread_pool.cond);  // Signal completion
+//         pthread_mutex_unlock(&thread_pool.mutex);
+//     }
+//     return NULL;
+// }
+
+// static bool checkSystemLoad() {
+//     double loadavg[1];
+//     if (getloadavg(loadavg, 1) == -1) {
+//         fprintf(stderr, "Warning: Could not get system load\n");
+//         return true;
+//     }
+    
+//     // Check if we're already handling lots of jobs
+//     pthread_mutex_lock(&thread_pool.mutex);
+//     int current_jobs = thread_pool.active_jobs;
+//     pthread_mutex_unlock(&thread_pool.mutex);
+    
+//     // Consider both system load and our own active jobs
+//     if (loadavg[0] > MAX_LOAD_AVERAGE || current_jobs > thread_pool.num_threads) {
+//         fprintf(stderr, "System busy: load=%.2f, active_jobs=%d, waiting...\n", 
+//                 loadavg[0], current_jobs);
+//         usleep(250000);  // Wait 250ms
+//         return false;
+//     }
+//     return true;
+// }
+
+// static bool fileExists(const char *path) {
+//     struct stat st;
+//     return stat(path, &st) == 0;
+// }
+
+// static unsigned char* checkCache(int64_t seed, int zoom, int x, int z, size_t* size) {
+//     time_t now = time(NULL);
+//     for (int i = 0; i < CACHE_SIZE; i++) {
+//         if (thread_pool.cache[i].seed == seed && 
+//             thread_pool.cache[i].zoom == zoom && 
+//             thread_pool.cache[i].x == x && 
+//             thread_pool.cache[i].z == z) {
+//             thread_pool.cache[i].last_accessed = now;
+//             *size = thread_pool.cache[i].size;
+//             return thread_pool.cache[i].image;
+//         }
+//     }
+//     return NULL;
+// }
+
+// static void addToCache(int64_t seed, int zoom, int x, int z, unsigned char* image, size_t size) {
+//     if (!image) return;
+    
+//     time_t now = time(NULL);
+//     time_t oldest = now;
+//     int oldest_index = thread_pool.cache_index;
+
+//     // Check if we already have this tile
+//     for (int i = 0; i < CACHE_SIZE; i++) {
+//         if (thread_pool.cache[i].seed == seed && 
+//             thread_pool.cache[i].zoom == zoom && 
+//             thread_pool.cache[i].x == x && 
+//             thread_pool.cache[i].z == z) {
+//             free(thread_pool.cache[i].image);
+//             thread_pool.cache[i].image = image;
+//             thread_pool.cache[i].size = size;
+//             thread_pool.cache[i].last_accessed = now;
+//             return;
+//         }
+//         if (thread_pool.cache[i].last_accessed < oldest) {
+//             oldest = thread_pool.cache[i].last_accessed;
+//             oldest_index = i;
+//         }
+//     }
+
+//     // Free any existing image in the slot we're going to use
+//     free(thread_pool.cache[oldest_index].image);
+    
+//     // Store the new cached tile
+//     thread_pool.cache[oldest_index].seed = seed;
+//     thread_pool.cache[oldest_index].zoom = zoom;
+//     thread_pool.cache[oldest_index].x = x;
+//     thread_pool.cache[oldest_index].z = z;
+//     thread_pool.cache[oldest_index].image = image;
+//     thread_pool.cache[oldest_index].size = size;
+//     thread_pool.cache[oldest_index].last_accessed = now;
+    
+//     // Move index to next slot for round-robin caching
+//     thread_pool.cache_index = (oldest_index + 1) % CACHE_SIZE;
+// }
+
+// static int createOutputPath(char *output, size_t max_len, int64_t seed, int zoom, int x, int z) {
+//     char dir[MAX_PATH_LENGTH];
+//     int len = snprintf(dir, sizeof(dir), "/var/www/production/gme-backend/storage/app/public/tiles/%" PRId64 "/%d/%d", seed, zoom, x);
+//     if (len < 0 || len >= sizeof(dir)) return -1;
+    
+//     if (createDirectory(dir)) return -1;
+    
+//     len = snprintf(output, max_len, "%s/%d.png", dir, z);
+//     return (len < 0 || len >= max_len) ? -1 : 0;
+// }
+
+// static void initialize() {
+//     int cores = get_nprocs();
+//     thread_pool.num_threads = (cores > 2) ? cores - 1 : 1;
+//     if (thread_pool.num_threads > MAX_THREADS) {
+//         thread_pool.num_threads = MAX_THREADS;
+//     }
+
+//     printf("Initializing with %d threads (system has %d cores)\n", thread_pool.num_threads, cores);
+    
+//     // Calculate buffer sizes based on largest possible tile
+//     size_t max_tile = 256; // Largest zoom level
+//     size_t max_img = max_tile * PIXELS_PER_CELL;
+//     size_t max_biome = max_tile * max_tile * sizeof(int);
+//     size_t max_rgb = 3 * max_img * max_img;
+    
+//     thread_pool.biome_cache = malloc(max_biome);
+//     thread_pool.rgb_buffer = malloc(max_rgb);
+//     if (!thread_pool.biome_cache || !thread_pool.rgb_buffer) {
+//         fprintf(stderr, "Memory allocation failed\n");
+//         exit(1);
+//     }
+    
+//     pthread_mutex_init(&thread_pool.mutex, NULL);
+//     pthread_cond_init(&thread_pool.cond, NULL);
+//     thread_pool.running = true;
+//     thread_pool.active_jobs = 0;
+//     thread_pool.total_jobs = 0;
+    
+//     for (int i = 0; i < thread_pool.num_threads; i++) {
+//         int* id = malloc(sizeof(int));
+//         if (id == NULL) {
+//             fprintf(stderr, "Memory allocation failed for thread ID\n");
+//             continue;
+//         }
+//         *id = i;
+//         if (pthread_create(&thread_pool.threads[i], NULL, workerThread, id)) {
+//             fprintf(stderr, "Thread creation failed\n");
+//             free(id);
+//             continue;
+//         }
+//     }
+    
+//     initBiomeColors(thread_pool.biome_colors);
+//     memset(thread_pool.cache, 0, sizeof(thread_pool.cache));
+//     thread_pool.cache_index = 0;
+// }
+
+// static void cleanup() {
+//     thread_pool.running = false;
+//     pthread_cond_broadcast(&thread_pool.cond);
+    
+//     for (int i = 0; i < thread_pool.num_threads; i++) {
+//         pthread_join(thread_pool.threads[i], NULL);
+//     }
+    
+//     pthread_mutex_destroy(&thread_pool.mutex);
+//     pthread_cond_destroy(&thread_pool.cond);
+    
+//     free(thread_pool.biome_cache);
+//     free(thread_pool.rgb_buffer);
+    
+//     for (int i = 0; i < CACHE_SIZE; i++) {
+//         free(thread_pool.cache[i].image);
+//     }
+// }
+
+// static int generateTile(int64_t seed, int zoom, int x, int z) {
+//     struct timespec start, end;
+//     clock_gettime(CLOCK_MONOTONIC, &start);
+    
+//     // Check if file already exists on disk
+//     char path[MAX_PATH_LENGTH];
+//     if (createOutputPath(path, sizeof(path), seed, zoom, x, z) == 0 && fileExists(path)) {
+//         printf("Tile already exists: %" PRId64 "/%d/%d/%d\n", seed, zoom, x, z);
+//         return 0;  // File exists, no need to regenerate
+//     }
+    
+//     // Get lock to ensure we don't have multiple processes generating the same tile
+//     int lock_fd = acquire_lock();
+//     if (lock_fd < 0) {
+//         fprintf(stderr, "Another process is already generating tiles, waiting...\n");
+//         sleep(1);
+//         return 1;  // Temporary failure, caller can retry
+//     }
+    
+//     // Check memory cache
+//     size_t cached_size;
+//     unsigned char* cached = checkCache(seed, zoom, x, z, &cached_size);
+//     if (cached) {
+//         if (createOutputPath(path, sizeof(path), seed, zoom, x, z) == 0) {
+//             int size = sqrt(cached_size/3);
+//             if (savePNG(path, cached, size, size) == 0) {
+//                 clock_gettime(CLOCK_MONOTONIC, &end);
+//                 double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+//                 printf("Cached tile %" PRId64 "/%d/%d/%d (%.3fs)\n", seed, zoom, x, z, elapsed);
+//                 release_lock(lock_fd);
+//                 return 0;
+//             }
+//         }
+//     }
+
+//     // Wait until system load is reasonable
+//     int wait_count = 0;
+//     const int max_waits = 5;  // Maximum number of times to check load
+//     while (!checkSystemLoad() && wait_count < max_waits) {
+//         wait_count++;
+//     }
+    
+//     if (wait_count >= max_waits) {
+//         fprintf(stderr, "System too busy, skipping tile %" PRId64 "/%d/%d/%d\n", seed, zoom, x, z);
+//         release_lock(lock_fd);
+//         return 1;
+//     }
+
+//     Generator g;
+//     setupGenerator(&g, MC_1_20, 0);
+//     applySeed(&g, DIM_OVERWORLD, seed);
+
+//     int tile_size = getTileSize(zoom);
+//     int width = tile_size * PIXELS_PER_CELL;
+//     int height = tile_size * PIXELS_PER_CELL;
+
+//     Range r = {
+//         .scale = CUBIOMES_SCALE,
+//         .x = x * tile_size,
+//         .z = z * tile_size,
+//         .sx = tile_size,
+//         .sz = tile_size,
+//         .y = 15,
+//         .sy = 1
+//     };
+
+//     // Generate biome data
+//     genBiomes(&g, thread_pool.biome_cache, r);
+    
+//     // Distribute work among threads
+//     pthread_mutex_lock(&thread_pool.mutex);
+//     thread_pool.active_jobs = thread_pool.num_threads;
+//     thread_pool.total_jobs++;
+    
+//     int rows_per_thread = height / thread_pool.num_threads;
+//     int remaining = height % thread_pool.num_threads;
+//     int current_row = 0;
+    
+//     for (int i = 0; i < thread_pool.num_threads; i++) {
+//         thread_pool.work[i].rgb = thread_pool.rgb_buffer;
+//         thread_pool.work[i].biomeIds = thread_pool.biome_cache;
+//         thread_pool.work[i].biomeColors = thread_pool.biome_colors;
+//         thread_pool.work[i].width = width;
+//         thread_pool.work[i].height = height;
+//         thread_pool.work[i].pixelsPerCell = PIXELS_PER_CELL;
+//         thread_pool.work[i].startRow = current_row;
+//         thread_pool.work[i].endRow = current_row + rows_per_thread + (i < remaining ? 1 : 0);
+//         thread_pool.work[i].done = false;
+//         current_row = thread_pool.work[i].endRow;
+//     }
+    
+//     pthread_cond_broadcast(&thread_pool.cond);
+    
+//     // Wait for all threads to complete with timeout
+//     struct timespec timeout_start, timeout_now;
+//     clock_gettime(CLOCK_MONOTONIC, &timeout_start);
+    
+//     bool complete = false;
+//     while (!complete) {
+//         struct timespec ts;
+//         clock_gettime(CLOCK_REALTIME, &ts);
+//         ts.tv_nsec += 100 * 1000000; // 100ms
+//         if (ts.tv_nsec >= 1000000000) {
+//             ts.tv_sec += 1;
+//             ts.tv_nsec -= 1000000000;
+//         }
+        
+//         if (pthread_cond_timedwait(&thread_pool.cond, &thread_pool.mutex, &ts) == ETIMEDOUT) {
+//             // Check if we've timed out
+//             clock_gettime(CLOCK_MONOTONIC, &timeout_now);
+//             double elapsed = (timeout_now.tv_sec - timeout_start.tv_sec) + 
+//                              (timeout_now.tv_nsec - timeout_start.tv_nsec) / 1e9;
+                             
+//             if (elapsed > TILE_GENERATION_TIMEOUT) {
+//                 fprintf(stderr, "Timeout generating tile %" PRId64 "/%d/%d/%d after %.1f seconds\n", 
+//                         seed, zoom, x, z, elapsed);
+                        
+//                 // Reset the work items
+//                 for (int i = 0; i < thread_pool.num_threads; i++) {
+//                     thread_pool.work[i].rgb = NULL;
+//                     thread_pool.work[i].done = true;
+//                 }
+//                 thread_pool.active_jobs = 0;
+//                 pthread_mutex_unlock(&thread_pool.mutex);
+//                 release_lock(lock_fd);
+//                 return 1;
+//             }
+//         }
+        
+//         // Check if all work is complete
+//         complete = (thread_pool.active_jobs == 0);
+//         if (complete) {
+//             break;
+//         }
+//     }
+    
+//     pthread_mutex_unlock(&thread_pool.mutex);
+    
+//     // Save the generated image
+//     if (createOutputPath(path, sizeof(path), seed, zoom, x, z) == 0) {
+//         if (savePNG(path, thread_pool.rgb_buffer, width, height) == 0) {
+//             // Cache the generated tile
+//             size_t img_size = width * height * 3;
+//             unsigned char* copy = malloc(img_size);
+//             if (copy) {
+//                 memcpy(copy, thread_pool.rgb_buffer, img_size);
+//                 addToCache(seed, zoom, x, z, copy, img_size);
+//             }
+            
+//             clock_gettime(CLOCK_MONOTONIC, &end);
+//             double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+//             printf("Generated tile %" PRId64 "/%d/%d/%d (%.3fs)\n", seed, zoom, x, z, elapsed);
+//             release_lock(lock_fd);
+//             return 0;
+//         }
+//     }
+    
+//     release_lock(lock_fd);
+//     return 1;
+// }
+
+// int main(int argc, char *argv[]) {
+//     if (argc < 5 || (argc-1) % 4 != 0) {
+//         fprintf(stderr, "Usage: %s <seed> <zoom1> <x1> <z1> [<zoom2> <x2> <z2> ...]\n", argv[0]);
+//         return 1;
+//     }
+    
+//     if (!isValidSeed(argv[1])) {
+//         fprintf(stderr, "Invalid seed (max %d digits)\n", MAX_SEED_LENGTH);
+//         return 1;
+//     }
+    
+//     char *end;
+//     int64_t seed = strtoll(argv[1], &end, 10);
+//     if (*end || seed == LLONG_MIN || seed == LLONG_MAX) {
+//         fprintf(stderr, "Seed out of range\n");
+//         return 1;
+//     }
+    
+//     initialize();
+//     int result = 0;
+//     int retries = 0;
+//     const int max_retries = 3;
+    
+//     for (int i = 1; i < argc; i += 4) {
+//         int zoom = atoi(argv[i+1]);
+//         int x = atoi(argv[i+2]);
+//         int z = atoi(argv[i+3]);
+        
+//         retries = 0;
+//         while (generateTile(seed, zoom, x, z) != 0 && retries < max_retries) {
+//             retries++;
+//             fprintf(stderr, "Retry %d for tile %" PRId64 "/%d/%d/%d\n", retries, seed, zoom, x, z);
+//             usleep(500000 * retries); // Progressive backoff
+//         }
+        
+//         if (retries >= max_retries) {
+//             fprintf(stderr, "Failed to generate tile %" PRId64 "/%d/%d/%d after %d attempts\n", 
+//                     seed, zoom, x, z, retries);
+//             result = 1;
+//         }
+//     }
+    
+//     cleanup();
+//     return result;
+// }
