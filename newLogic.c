@@ -275,7 +275,7 @@ static void addToCache(int64_t seed, int zoom, int x, int z, unsigned char* imag
 }
 
 static int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
-    char basePath[] = "/var/www/storage/app/public/tiles";
+    char basePath[] = "/var/www/production/gme-backend/storage/app/public/tiles";
     char tmpPath[MAX_PATH_LENGTH];
     
     int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRId64 "/%d/%d", basePath, seed, zoom, x);
