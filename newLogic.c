@@ -227,7 +227,7 @@ static void addToCache(int64_t seed, int zoom, int x, int z, unsigned char* imag
 
 static int createOutputPath(char *output, size_t max_len, int64_t seed, int zoom, int x, int z) {
     char dir[MAX_PATH_LENGTH];
-    int len = snprintf(dir, sizeof(dir), "/var/www/storage/app/public/tiles/%" PRId64 "/%d/%d", seed, zoom, x);
+    int len = snprintf(dir, sizeof(dir), "/var/www/production/gme-backend/storage/app/public/tiles/%" PRId64 "/%d/%d", seed, zoom, x);
     if (len < 0 || len >= sizeof(dir)) return -1;
     if (createDirectory(dir)) return -1;
     len = snprintf(output, max_len, "%s/%d.png", dir, z);
