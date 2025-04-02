@@ -1,230 +1,3 @@
-// #include "generator.h"
-// #include "util.h"
-// #include "image_utils.h"
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <sys/stat.h>
-// #include <sys/types.h>
-// #include <errno.h>
-// #include <string.h>
-// #include <pthread.h>
-
-// #define MAX_PATH_LENGTH 512  // Increased from 256 to handle longer paths
-// #define DEFAULT_TILE_SIZE 16
-// #define PIXELS_PER_CELL 4
-// #define CUBIOMES_SCALE 4
-// #define DIR_PERMISSIONS 0777
-// #define NUM_THREADS 2
-
-// // Lookup table for zoom levels to tile sizes
-// static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
-// #define NUM_ZOOM_LEVELS (sizeof(ZOOM_TILE_SIZES) / sizeof(ZOOM_TILE_SIZES[0]))
-
-// static int getTileSize(int zoom) {
-//     if (zoom >= 0 && zoom < NUM_ZOOM_LEVELS) {
-//         return ZOOM_TILE_SIZES[zoom];
-//     }
-//     return DEFAULT_TILE_SIZE;
-// }
-
-// static int createSingleDirectory(const char *path) {
-//     if (mkdir(path, DIR_PERMISSIONS) != 0) {
-//         if (errno != EEXIST) {
-//             fprintf(stderr, "Error creating directory %s: %s\n", path, strerror(errno));
-//             return -1;
-//         }
-//     }
-//     return 0;
-// }
-
-// static int createDirectories(const char *path) {
-//     char tmp[MAX_PATH_LENGTH];
-//     char *p;
-    
-//     if (strlen(path) >= MAX_PATH_LENGTH) {
-//         fprintf(stderr, "Path too long\n");
-//         return -1;
-//     }
-    
-//     strncpy(tmp, path, MAX_PATH_LENGTH - 1);
-//     tmp[MAX_PATH_LENGTH - 1] = '\0';
-    
-//     for (p = tmp + 1; *p; p++) {
-//         if (*p == '/') {
-//             *p = '\0';
-//             if (createSingleDirectory(tmp) < 0) return -1;
-//             *p = '/';
-//         }
-//     }
-    
-//     return createSingleDirectory(tmp);
-// }
-
-// typedef struct {
-//     unsigned char *rgb;
-//     const int *biomeIds;
-//     const unsigned char (*biomeColors)[3];
-//     int startRow;
-//     int endRow;
-//     int width;
-//     int height;
-//     int pixelsPerCell;
-// } ThreadData;
-
-// static void *processChunk(void *arg) {
-//     ThreadData *data = (ThreadData *)arg;
-//     const int width = data->width;
-//     const int pixelsPerCell = data->pixelsPerCell;
-//     const int scaledWidth = width / pixelsPerCell;
-    
-//     for (int y = data->startRow; y < data->endRow; y++) {
-//         const int scaledY = y / pixelsPerCell;
-//         const int rowOffset = y * width;
-//         const int scaledRowOffset = scaledY * scaledWidth;
-        
-//         for (int x = 0; x < width; x++) {
-//             const int scaledX = x / pixelsPerCell;
-//             const int biomeIdx = scaledRowOffset + scaledX;
-//             const int pixelIdx = (rowOffset + x) * 3;
-            
-//             memcpy(&data->rgb[pixelIdx], 
-//                    data->biomeColors[data->biomeIds[biomeIdx]], 
-//                    3);
-//         }
-//     }
-    
-//     return NULL;
-// }
-
-// static void parallelBiomesToImage(unsigned char *rgb, 
-//                                 const unsigned char biomeColors[][3], 
-//                                 const int *biomeIds, 
-//                                 int width, int height, 
-//                                 int pixelsPerCell) {
-//     pthread_t threads[NUM_THREADS];
-//     ThreadData threadData[NUM_THREADS];
-    
-//     int rowsPerThread = height / NUM_THREADS;
-//     int remainingRows = height % NUM_THREADS;
-    
-//     int currentRow = 0;
-//     for (int i = 0; i < NUM_THREADS; i++) {
-//         threadData[i].rgb = rgb;
-//         threadData[i].biomeIds = biomeIds;
-//         threadData[i].biomeColors = biomeColors;
-//         threadData[i].width = width;
-//         threadData[i].height = height;
-//         threadData[i].pixelsPerCell = pixelsPerCell;
-//         threadData[i].startRow = currentRow;
-        
-//         threadData[i].endRow = currentRow + rowsPerThread;
-//         if (i < remainingRows) {
-//             threadData[i].endRow++;
-//         }
-//         currentRow = threadData[i].endRow;
-        
-//         pthread_create(&threads[i], NULL, processChunk, &threadData[i]);
-//     }
-    
-//     for (int i = 0; i < NUM_THREADS; i++) {
-//         pthread_join(threads[i], NULL);
-//     }
-// }
-
-// static int createOutputPath(char *outputPath, size_t maxLen, int seed, int zoom, int x, int z) {
-//     char basePath[] = "/var/www/storage/app/public/tiles";
-//     char tmpPath[MAX_PATH_LENGTH];
-    
-//     // First create the directory path
-//     int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%d/%d/%d", 
-//                          basePath, seed, zoom, x);
-//     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
-//         return -1;
-//     }
-    
-//     // Create the directories
-//     if (createDirectories(tmpPath) < 0) {
-//         return -1;
-// }
-    
-//     // Then create the full file path
-//     int fullLen = snprintf(outputPath, maxLen, "%s/%d.png", tmpPath, z);
-//     if (fullLen < 0 || fullLen >= maxLen) {
-//         return -1;
-//     }
-    
-//     return 0;
-// }
-
-// int main(int argc, char *argv[]) {
-//     if (argc < 5) {
-//         fprintf(stderr, "Usage: %s <seed> <zoom> <x> <z>\n", argv[0]);
-//         return 1;
-//     }
-
-//     int seed = atoi(argv[1]);
-//     int zoom = atoi(argv[2]);
-//     int x = atoi(argv[3]);
-//     int z = atoi(argv[4]);
-
-//     Generator g;
-//     setupGenerator(&g, MC_1_20, 0);
-//     applySeed(&g, DIM_OVERWORLD, (int64_t)seed);
-
-//     int tileSize = getTileSize(zoom);
-//     int imgWidth = tileSize * PIXELS_PER_CELL;
-//     int imgHeight = tileSize * PIXELS_PER_CELL;
-
-//     Range r = {
-//         .scale = CUBIOMES_SCALE,
-//         .x = x * tileSize,
-//         .z = z * tileSize,
-//         .sx = tileSize,
-//         .sz = tileSize,
-//         .y = 15,
-//         .sy = 1
-//     };
-
-//     int *biomeIds = malloc(sizeof(int) * r.sx * r.sz);
-//     if (!biomeIds) {
-//         fprintf(stderr, "Failed to allocate biome cache\n");
-//         return 1;
-//     }
-
-//     unsigned char *rgb = malloc(3 * imgWidth * imgHeight);
-//     if (!rgb) {
-//         fprintf(stderr, "Failed to allocate RGB buffer\n");
-//         free(biomeIds);
-//         return 1;
-//     }
-
-//     genBiomes(&g, biomeIds, r);
-
-//     unsigned char biomeColors[256][3];
-//     initBiomeColors(biomeColors);
-//     parallelBiomesToImage(rgb, biomeColors, biomeIds, imgWidth, imgHeight, PIXELS_PER_CELL);
-
-//     char outputPath[MAX_PATH_LENGTH];
-//     if (createOutputPath(outputPath, sizeof(outputPath), seed, zoom, x, z) < 0) {
-//         fprintf(stderr, "Failed to create output path\n");
-//         free(biomeIds);
-//         free(rgb);
-//         return 1;
-//     }
-    
-//     if (savePNG(outputPath, rgb, imgWidth, imgHeight) != 0) {
-//         fprintf(stderr, "Error saving image %s: %s\n", outputPath, strerror(errno));
-//         free(biomeIds);
-//         free(rgb);
-//         return 1;
-//     }
-
-//     printf("Saved: %s\n", outputPath);
-//     free(biomeIds);
-//     free(rgb);
-//     return 0;
-// }
-
 #include "generator.h"
 #include "util.h"
 #include "image_utils.h"
@@ -237,7 +10,10 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <time.h>
-#include <unistd.h>  // Added for usleep()
+#include <unistd.h>
+#include <ctype.h>
+#include <inttypes.h>
+#include <limits.h>
 
 #define MAX_PATH_LENGTH 512
 #define DEFAULT_TILE_SIZE 16
@@ -246,6 +22,7 @@
 #define DIR_PERMISSIONS 0777
 #define NUM_THREADS 4
 #define CACHE_SIZE 100
+#define MAX_SEED_LENGTH 19 // Maximum digits for int64_t (including sign)
 
 // Lookup table for zoom levels to tile sizes
 static const int ZOOM_TILE_SIZES[] = {256, 128, 64, 32, 16, 16};
@@ -264,7 +41,7 @@ static pthread_cond_t workCond = PTHREAD_COND_INITIALIZER;
 
 // Tile cache
 typedef struct {
-    int seed;
+    int64_t seed;
     int zoom;
     int x;
     int z;
@@ -289,6 +66,37 @@ typedef struct {
 } WorkItem;
 
 static WorkItem workItems[NUM_THREADS];
+
+static bool isValidSeed(const char *str) {
+    if (str == NULL || *str == '\0') {
+        return false;
+    }
+    
+    // Check length (up to 19 digits plus optional sign)
+    size_t len = strlen(str);
+    if (len > MAX_SEED_LENGTH + 1) { // +1 for possible sign
+        return false;
+    }
+    
+    // Check for optional leading sign
+    const char *p = str;
+    if (*p == '-' || *p == '+') {
+        p++;
+        // After sign we need at least one digit
+        if (*p == '\0') {
+            return false;
+        }
+    }
+    
+    // Check remaining characters are digits
+    for (; *p; p++) {
+        if (!isdigit(*p)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
 
 static int getTileSize(int zoom) {
     return (zoom >= 0 && zoom < (int)NUM_ZOOM_LEVELS) ? ZOOM_TILE_SIZES[zoom] : DEFAULT_TILE_SIZE;
@@ -429,7 +237,7 @@ static void parallelBiomesToImage(unsigned char *rgb,
     } while (!allDone);
 }
 
-static unsigned char* checkCache(int seed, int zoom, int x, int z, size_t* size) {
+static unsigned char* checkCache(int64_t seed, int zoom, int x, int z, size_t* size) {
     for (int i = 0; i < CACHE_SIZE; i++) {
         if (tileCache[i].seed == seed && 
             tileCache[i].zoom == zoom && 
@@ -442,7 +250,7 @@ static unsigned char* checkCache(int seed, int zoom, int x, int z, size_t* size)
     return NULL;
 }
 
-static void addToCache(int seed, int zoom, int x, int z, unsigned char* image, size_t size) {
+static void addToCache(int64_t seed, int zoom, int x, int z, unsigned char* image, size_t size) {
     // Free old cache entry if it exists
     for (int i = 0; i < CACHE_SIZE; i++) {
         if (tileCache[i].seed == seed && 
@@ -466,11 +274,11 @@ static void addToCache(int seed, int zoom, int x, int z, unsigned char* image, s
     cacheIndex = (cacheIndex + 1) % CACHE_SIZE;
 }
 
-static int createOutputPath(char *outputPath, size_t maxLen, int seed, int zoom, int x, int z) {
+static int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
     char basePath[] = "/var/www/storage/app/public/tiles";
     char tmpPath[MAX_PATH_LENGTH];
     
-    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%d/%d/%d", basePath, seed, zoom, x);
+    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRId64 "/%d/%d", basePath, seed, zoom, x);
     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
         return -1;
     }
@@ -543,7 +351,7 @@ static void cleanup() {
     }
 }
 
-static int generateTile(int seed, int zoom, int x, int z) {
+static int generateTile(int64_t seed, int zoom, int x, int z) {
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
     
@@ -557,20 +365,21 @@ static int generateTile(int seed, int zoom, int x, int z) {
             return 1;
         }
         
-        if (savePNG(outputPath, cachedImage, sqrt(cachedSize/3), sqrt(cachedSize/3)) != 0) {
+        int imgSize = sqrt(cachedSize/3);
+        if (savePNG(outputPath, cachedImage, imgSize, imgSize) != 0) {
             fprintf(stderr, "Error saving image %s: %s\n", outputPath, strerror(errno));
             return 1;
         }
         
         clock_gettime(CLOCK_MONOTONIC, &end);
         double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-        printf("Cached tile %d/%d/%d/%d saved in %.3f seconds\n", seed, zoom, x, z, elapsed);
+        printf("Cached tile %" PRId64 "/%d/%d/%d saved in %.3f seconds\n", seed, zoom, x, z, elapsed);
         return 0;
     }
     
     Generator g;
     setupGenerator(&g, MC_1_20, 0);
-    applySeed(&g, DIM_OVERWORLD, (int64_t)seed);
+    applySeed(&g, DIM_OVERWORLD, seed);
 
     int tileSize = getTileSize(zoom);
     int imgWidth = tileSize * PIXELS_PER_CELL;
@@ -610,7 +419,7 @@ static int generateTile(int seed, int zoom, int x, int z) {
     
     clock_gettime(CLOCK_MONOTONIC, &end);
     double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-    printf("Tile %d/%d/%d/%d generated in %.3f seconds\n", seed, zoom, x, z, elapsed);
+    printf("Tile %" PRId64 "/%d/%d/%d generated in %.3f seconds\n", seed, zoom, x, z, elapsed);
     return 0;
 }
 
@@ -620,9 +429,22 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
+    // Validate seed format
+    if (!isValidSeed(argv[1])) {
+        fprintf(stderr, "Error: Seed must be a number (positive or negative) with up to %d digits\n", MAX_SEED_LENGTH);
+        return 1;
+    }
+    
+    // Convert seed string to int64_t
+    char *endptr;
+    int64_t seed = strtoll(argv[1], &endptr, 10);
+    if (*endptr != '\0' || seed == LLONG_MIN || seed == LLONG_MAX) {
+        fprintf(stderr, "Error: Invalid seed value (out of range)\n");
+        return 1;
+    }
+    
     initialize();
     
-    int seed = atoi(argv[1]);
     int result = 0;
     
     for (int i = 1; i < argc; i += 4) {
