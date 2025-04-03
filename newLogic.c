@@ -146,13 +146,15 @@ static void parallelBiomesToImage(unsigned char *rgb,
 //     return 0;
 // }
 
-int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
+// int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
+    int createOutputPath(char *outputPath, size_t maxLen, uint64_t seed, int zoom, int x, int z) {
     char basePath[] = "/var/www/production/gme-backend/storage/app/public/tiles";
     // char basePath[] = "/var/www/storage/app/public/tiles/";
     char tmpPath[MAX_PATH_LENGTH];
 
     // Use PRId64 to ensure proper formatting for int64_t
-    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRId64 "/%d/%d", basePath, seed, zoom, x);
+    // int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRId64 "/%d/%d", basePath, seed, zoom, x);
+    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRIu64 "/%d/%d", basePath, seed, zoom, x);
     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
         fprintf(stderr, "Path snprintf failed\n");
         return -1;
@@ -174,25 +176,22 @@ int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, in
     return 0;
 }
 
-int64_t parseSeed(const char *str) {
+uint64_t parseSeed(const char *str) {
     char *endptr;
-    errno = 0; // Reset error number
-    
-    // Use strtoll which has better error handling than atoll
-    int64_t result = strtoll(str, &endptr, 10);
-    
-    // Check for conversion errors
+    errno = 0;
+
+    uint64_t result = strtoull(str, &endptr, 10);  // Use strtoull for uint64_t
+
     if (errno == ERANGE) {
-        fprintf(stderr, "Seed value out of range for int64_t: %s\n", str);
+        fprintf(stderr, "Seed value out of range for uint64_t: %s\n", str);
         exit(1);
     }
-    
-    // Check if entire string was consumed
+
     if (*endptr != '\0') {
         fprintf(stderr, "Invalid characters in seed: %s\n", str);
         exit(1);
     }
-    
+
     return result;
 }
 
@@ -203,12 +202,14 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int64_t seed = parseSeed(argv[1]);
+    // int64_t seed = parseSeed(argv[1]);
+    uint64_t seed = parseSeed(argv[1]);
     int zoom = atoi(argv[2]);
     int x = atoi(argv[3]);
     int z = atoi(argv[4]);
 
-    printf("Seed: %" PRId64 ", Zoom: %d, X: %d, Z: %d\n", seed, zoom, x, z);
+    // printf("Seed: %" PRId64 ", Zoom: %d, X: %d, Z: %d\n", seed, zoom, x, z);
+    printf("Seed: %" PRIu64 ", Zoom: %d, X: %d, Z: %d\n", seed, zoom, x, z);
 
     Generator g;
     setupGenerator(&g, MC_1_20, 0);
