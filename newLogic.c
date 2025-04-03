@@ -131,18 +131,45 @@ static void parallelBiomesToImage(unsigned char *rgb,
     }
 }
 
-static int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
+// static int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
+//     char basePath[] = "/var/www/production/gme-backend/storage/app/public/tiles";
+//     char tmpPath[MAX_PATH_LENGTH];
+
+//     int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%ld/%d/%d", basePath, seed, zoom, x);
+//     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) return -1;
+
+//     if (createDirectories(tmpPath) < 0) return -1;
+
+//     int fullLen = snprintf(outputPath, maxLen, "%s/%d.png", tmpPath, z);
+//     if (fullLen < 0 || fullLen >= maxLen) return -1;
+
+//     return 0;
+// }
+
+int createOutputPath(char *outputPath, size_t maxLen, int64_t seed, int zoom, int x, int z) {
     char basePath[] = "/var/www/production/gme-backend/storage/app/public/tiles";
     char tmpPath[MAX_PATH_LENGTH];
 
-    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%ld/%d/%d", basePath, seed, zoom, x);
-    if (dirLen < 0 || dirLen >= sizeof(tmpPath)) return -1;
+    // Use PRId64 to ensure proper formatting for int64_t
+    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRId64 "/%d/%d", basePath, seed, zoom, x);
+    if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
+        fprintf(stderr, "Path snprintf failed\n");
+        return -1;
+    }
 
-    if (createDirectories(tmpPath) < 0) return -1;
+    printf("Creating directory: %s\n", tmpPath);  // Debugging output
+    if (createDirectories(tmpPath) < 0) {
+        fprintf(stderr, "Failed to create directories: %s\n", tmpPath);
+        return -1;
+    }
 
     int fullLen = snprintf(outputPath, maxLen, "%s/%d.png", tmpPath, z);
-    if (fullLen < 0 || fullLen >= maxLen) return -1;
+    if (fullLen < 0 || fullLen >= maxLen) {
+        fprintf(stderr, "Output path snprintf failed\n");
+        return -1;
+    }
 
+    printf("Final output path: %s\n", outputPath);  // Debugging output
     return 0;
 }
 
