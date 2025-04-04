@@ -211,7 +211,7 @@ uint64_t parseSeed(const char *str) {
     errno = 0;
     
     // First try to parse as a regular number
-    unsigned long long result = strtoull(str, &endptr, 10);
+    unsigned long long ull_result = strtoull(str, &endptr, 10);
     
     // Check for overflow
     if (errno == ERANGE || *endptr != '\0') {
@@ -231,8 +231,11 @@ uint64_t parseSeed(const char *str) {
         return hash;
     }
     
-    fprintf(stderr, "Successfully parsed seed: %" PRIu64 "\n", result);
-    return result;
+    // Use the appropriate format specifier for unsigned long long
+    fprintf(stderr, "Successfully parsed seed: %llu\n", ull_result);
+    
+    // Return the result cast to uint64_t
+    return (uint64_t)ull_result;
 }
 
 
