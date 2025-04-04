@@ -227,11 +227,11 @@ uint64_t parseSeed(const char *str) {
             hash = ((hash << 5) + hash) + c; // hash * 33 + c
         }
         
-        fprintf(stderr, "Generated hash seed: %llu\n", hash);
+        fprintf(stderr, "Generated hash seed: %" PRIu64 "\n", hash);
         return hash;
     }
     
-    fprintf(stderr, "Successfully parsed seed: %llu\n", result);
+    fprintf(stderr, "Successfully parsed seed: %" PRIu64 "\n", result);
     return result;
 }
 
