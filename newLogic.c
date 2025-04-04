@@ -180,61 +180,68 @@ static void parallelBiomesToImage(unsigned char *rgb,
 //     char *endptr;
 //     errno = 0;
     
-//     // Use strtoul with explicit base 10
-//     unsigned long long result = strtoull(str, &endptr, 10);
+//     // First try to parse as a regular number
+//     unsigned long long ull_result = strtoull(str, &endptr, 10);
     
-//     // Check for conversion errors
-//     if (errno == ERANGE) {
-//         fprintf(stderr, "Seed value out of range for uint64_t: %s\n", str);
-//         // Instead of exiting, try to use a default seed
-//         fprintf(stderr, "Using default seed instead\n");
-//         return 42; // Use a safe default seed
+//     // Check for overflow
+//     if (errno == ERANGE || *endptr != '\0') {
+//         fprintf(stderr, "Seed value out of range or invalid format: %s\n", str);
+//         fprintf(stderr, "Using hash of seed string instead\n");
+        
+//         // Use a simple hash function to convert the string to a uint64_t
+//         uint64_t hash = 5381;
+//         int c;
+//         const char *ptr = str;
+        
+//         while ((c = *ptr++)) {
+//             hash = ((hash << 5) + hash) + c; // hash * 33 + c
+//         }
+        
+//         fprintf(stderr, "Generated hash seed: %" PRIu64 "\n", hash);
+//         return hash;
 //     }
     
-//     // Check if entire string was consumed
-//     if (*endptr != '\0') {
-//         fprintf(stderr, "Invalid characters in seed: %s (stopped at: %c)\n", 
-//                 str, *endptr);
-//         // Instead of exiting, try to handle it gracefully
-//         fprintf(stderr, "Using partial valid seed\n");
-//         // Still return what was successfully parsed
-//         return result;
-//     }
+//     // Use the appropriate format specifier for unsigned long long
+//     fprintf(stderr, "Successfully parsed seed: %llu\n", ull_result);
     
-//     // Print the parsed result for debugging
-//     fprintf(stderr, "Successfully parsed seed: %llu\n", result);
-//     return result;
+//     // Return the result cast to uint64_t
+//     return (uint64_t)ull_result;
 // }
 
 uint64_t parseSeed(const char *str) {
-    char *endptr;
-    errno = 0;
-    
-    // First try to parse as a regular number
-    unsigned long long ull_result = strtoull(str, &endptr, 10);
-    
-    // Check for overflow
-    if (errno == ERANGE || *endptr != '\0') {
-        fprintf(stderr, "Seed value out of range or invalid format: %s\n", str);
-        fprintf(stderr, "Using hash of seed string instead\n");
-        
-        // Use a simple hash function to convert the string to a uint64_t
+    // Fast path: try a quick hash for very large values
+    size_t len = strlen(str);
+    if (len > 18) {  // A uint64_t can hold at most 20 digits
         uint64_t hash = 5381;
-        int c;
         const char *ptr = str;
+        int c;
         
         while ((c = *ptr++)) {
             hash = ((hash << 5) + hash) + c; // hash * 33 + c
         }
         
-        fprintf(stderr, "Generated hash seed: %" PRIu64 "\n", hash);
+        fprintf(stderr, "Large seed detected, using hash: %" PRIu64 "\n", hash);
         return hash;
     }
     
-    // Use the appropriate format specifier for unsigned long long
-    fprintf(stderr, "Successfully parsed seed: %llu\n", ull_result);
+    // Standard path for smaller values
+    char *endptr;
+    errno = 0;
+    unsigned long long ull_result = strtoull(str, &endptr, 10);
     
-    // Return the result cast to uint64_t
+    if (errno == ERANGE || *endptr != '\0') {
+        uint64_t hash = 5381;
+        const char *ptr = str;
+        int c;
+        
+        while ((c = *ptr++)) {
+            hash = ((hash << 5) + hash) + c;
+        }
+        
+        fprintf(stderr, "Invalid seed format, using hash: %" PRIu64 "\n", hash);
+        return hash;
+    }
+    
     return (uint64_t)ull_result;
 }
 
