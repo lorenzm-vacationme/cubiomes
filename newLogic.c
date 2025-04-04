@@ -176,22 +176,62 @@ static void parallelBiomesToImage(unsigned char *rgb,
     return 0;
 }
 
+// uint64_t parseSeed(const char *str) {
+//     char *endptr;
+//     errno = 0;
+    
+//     // Use strtoul with explicit base 10
+//     unsigned long long result = strtoull(str, &endptr, 10);
+    
+//     // Check for conversion errors
+//     if (errno == ERANGE) {
+//         fprintf(stderr, "Seed value out of range for uint64_t: %s\n", str);
+//         // Instead of exiting, try to use a default seed
+//         fprintf(stderr, "Using default seed instead\n");
+//         return 42; // Use a safe default seed
+//     }
+    
+//     // Check if entire string was consumed
+//     if (*endptr != '\0') {
+//         fprintf(stderr, "Invalid characters in seed: %s (stopped at: %c)\n", 
+//                 str, *endptr);
+//         // Instead of exiting, try to handle it gracefully
+//         fprintf(stderr, "Using partial valid seed\n");
+//         // Still return what was successfully parsed
+//         return result;
+//     }
+    
+//     // Print the parsed result for debugging
+//     fprintf(stderr, "Successfully parsed seed: %llu\n", result);
+//     return result;
+// }
+
 uint64_t parseSeed(const char *str) {
     char *endptr;
     errno = 0;
-
-    uint64_t result = strtoull(str, &endptr, 10);  // Use strtoull for uint64_t
-
-    if (errno == ERANGE) {
-        fprintf(stderr, "Seed value out of range for uint64_t: %s\n", str);
-        exit(1);
+    
+    // First try to parse as a regular number
+    unsigned long long result = strtoull(str, &endptr, 10);
+    
+    // Check for overflow
+    if (errno == ERANGE || *endptr != '\0') {
+        fprintf(stderr, "Seed value out of range or invalid format: %s\n", str);
+        fprintf(stderr, "Using hash of seed string instead\n");
+        
+        // Use a simple hash function to convert the string to a uint64_t
+        uint64_t hash = 5381;
+        int c;
+        const char *ptr = str;
+        
+        while ((c = *ptr++)) {
+            hash = ((hash << 5) + hash) + c; // hash * 33 + c
+        }
+        
+        fprintf(stderr, "Generated hash seed: %llu\n", hash);
+        return hash;
     }
-
-    if (*endptr != '\0') {
-        fprintf(stderr, "Invalid characters in seed: %s\n", str);
-        exit(1);
-    }
-
+    
+    fprintf(stderr, "Successfully parsed seed: %llu\n", result);
     return result;
 }
 
