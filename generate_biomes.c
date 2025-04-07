@@ -3,10 +3,89 @@
 #include <string.h>
 #include <sys/stat.h>  // For mkdir()
 #include <sys/types.h>
-#include <unistd.h>    // For access()
+//#include <unistd.h>    // For access()
 #include "generator.h"
 #include "util.h"
 #include "image_utils.h"
+#include <stdint.h>    // For uint64_t
+#include <errno.h>
+#include <inttypes.h>
+
+
+// int main(int argc, char *argv[])
+// {
+//     if (argc < 3)
+//     {
+//         printf("Usage: %s <path> <seed>\n", argv[0]);
+//         return 1;
+//     }
+
+//     char *path = argv[1];
+//     int64_t seed = strtoll(argv[2], NULL, 10);  // Convert seed string to int64_t
+//     char *basePath;
+
+//     if (strcmp(path, "production") == 0) {
+//         basePath = "/var/www/production/gme-backend/storage/app/public/images/2d-map";
+//     } else if (strcmp(path, "staging") == 0) {
+//         basePath = "/var/www/staging/gme-backend/storage/app/public/images/2d-map";
+//     } else {
+//         basePath = "/var/www/storage/app/public/images/2d-map";
+//     }
+
+//     char filePath[512];
+//     snprintf(filePath, sizeof(filePath), "%s/2d-map_%lld.png", basePath, seed);
+
+//     printf("Generating and saving map to: %s\n", filePath);
+
+//     Generator g;
+//     setupGenerator(&g, MC_1_20, 0);
+//     applySeed(&g, DIM_OVERWORLD, seed);
+
+//     Range r;
+//     r.scale = 4;
+//     r.x = 0, r.z = 0;
+//     r.sx = 400, r.sz = 400;
+//     r.y = 15, r.sy = 1;
+
+//     int *biomeIds = allocCache(&g, r);
+//     genBiomes(&g, biomeIds, r);
+
+//     int pix4cell = 16;
+//     int imgWidth = pix4cell * r.sx, imgHeight = pix4cell * r.sz;
+//     unsigned char biomeColors[256][3];
+//     initBiomeColors(biomeColors);
+//     unsigned char *rgb = (unsigned char *)malloc(3 * imgWidth * imgHeight);
+//     biomesToImage(rgb, biomeColors, biomeIds, r.sx, r.sz, pix4cell, 2);
+
+//     // Save as PNG
+//     savePNG(filePath, rgb, imgWidth, imgHeight);
+
+//     free(biomeIds);
+//     free(rgb);
+
+//     return 0;
+// }
+
+int32_t javaHashCode(const char *str) {
+    int32_t hash = 0;
+    while (*str) {
+        hash = 31 * hash + (unsigned char)(*str++);
+    }
+    return hash;
+}
+
+int64_t parseMinecraftSeed(const char *input) {
+    char *endptr;
+    errno = 0;
+    int64_t seed = strtoll(input, &endptr, 10);
+
+    if (errno == ERANGE || *endptr != '\0') {
+        // Seed is too long or has junk: treat as string
+        seed = (int64_t) javaHashCode(input);
+    }
+
+    return seed;
+}
 
 int main(int argc, char *argv[])
 {
@@ -17,7 +96,8 @@ int main(int argc, char *argv[])
     }
 
     char *path = argv[1];
-    int64_t seed = strtoll(argv[2], NULL, 10);  // Convert seed string to int64_t
+    char *seedStr = argv[2];  // Store original seed string
+    int64_t seed = parseMinecraftSeed(seedStr);  // Use your function to get numeric seed
     char *basePath;
 
     if (strcmp(path, "production") == 0) {
@@ -29,13 +109,14 @@ int main(int argc, char *argv[])
     }
 
     char filePath[512];
-    snprintf(filePath, sizeof(filePath), "%s/2d-map_%ld.png", basePath, seed);
+    // Use the original seed string for the filename
+    snprintf(filePath, sizeof(filePath), "%s/2d-map_%s.png", basePath, seedStr);
 
     printf("Generating and saving map to: %s\n", filePath);
 
     Generator g;
     setupGenerator(&g, MC_1_20, 0);
-    applySeed(&g, DIM_OVERWORLD, seed);
+    applySeed(&g, DIM_OVERWORLD, seed);  // Use the parsed numeric seed for generation
 
     Range r;
     r.scale = 4;
