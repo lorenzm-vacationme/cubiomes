@@ -338,6 +338,7 @@
 //      return 0;
 //  }
 
+
 #include "generator.h"
 #include "util.h"
 #include "image_utils.h"
@@ -473,17 +474,45 @@ static void parallelBiomesToImage(unsigned char *rgb,
     }
 }
 
-int createOutputPath(char *outputPath, size_t maxLen, uint64_t seed, int zoom, int x, int z) {
-    char basePath[] = "/var/www/storage/app/public/tiles/";
+// int createOutputPath(char *outputPath, size_t maxLen, uint64_t seed, int zoom, int x, int z) {
+//     char basePath[] = "/var/www/storage/app/public/tiles/";
+//     char tmpPath[MAX_PATH_LENGTH];
+
+//     int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRIu64 "/%d/%d", basePath, seed, zoom, x);
+//     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
+//         fprintf(stderr, "Path snprintf failed\n");
+//         return -1;
+//     }
+
+//     printf("Creating directory: %s\n", tmpPath);  // Debugging output
+//     if (createDirectories(tmpPath) < 0) {
+//         fprintf(stderr, "Failed to create directories: %s\n", tmpPath);
+//         return -1;
+//     }
+
+//     int fullLen = snprintf(outputPath, maxLen, "%s/%d.ppm", tmpPath, z);
+//     if (fullLen < 0 || fullLen >= maxLen) {
+//         fprintf(stderr, "Output path snprintf failed\n");
+//         return -1;
+//     }
+
+//     printf("Final output path: %s\n", outputPath);  // Debugging output
+//     return 0;
+// }
+
+int createOutputPath(char *outputPath, size_t maxLen, const char *seedStr, int zoom, int x, int z) {
+    char basePath[] = "/var/www/production/gme-backend/storage/app/public/tiles";
+    // char basePath[] = "/var/www/storage/app/public/tiles/";
     char tmpPath[MAX_PATH_LENGTH];
 
-    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%" PRIu64 "/%d/%d", basePath, seed, zoom, x);
+    // Use the original seed string in the path
+    int dirLen = snprintf(tmpPath, sizeof(tmpPath), "%s/%s/%d/%d", basePath, seedStr, zoom, x);
     if (dirLen < 0 || dirLen >= sizeof(tmpPath)) {
         fprintf(stderr, "Path snprintf failed\n");
         return -1;
     }
 
-    printf("Creating directory: %s\n", tmpPath);  // Debugging output
+    printf("Creating directory: %s\n", tmpPath);
     if (createDirectories(tmpPath) < 0) {
         fprintf(stderr, "Failed to create directories: %s\n", tmpPath);
         return -1;
@@ -495,44 +524,63 @@ int createOutputPath(char *outputPath, size_t maxLen, uint64_t seed, int zoom, i
         return -1;
     }
 
-    printf("Final output path: %s\n", outputPath);  // Debugging output
+    printf("Final output path: %s\n", outputPath);
     return 0;
 }
 
+// uint64_t parseSeed(const char *str) {
+//     // Fast path: try a quick hash for very large values
+//     size_t len = strlen(str);
+//     if (len > 32) {  // A uint64_t can hold at most 20 digits
+//         uint64_t hash = 5381;
+//         const char *ptr = str;
+//         int c;
+
+//         while ((c = *ptr++)) {
+//             hash = ((hash << 5) + hash) + c; // hash * 33 + c
+//         }
+
+//         fprintf(stderr, "Large seed detected, using hash: %" PRIu64 "\n", hash);
+//         return hash;
+//     }
+
+//     // Standard path for smaller values
+//     char *endptr;
+//     errno = 0;
+//     unsigned long long ull_result = strtoull(str, &endptr, 10);
+
+//     if (errno == ERANGE || *endptr != '\0') {
+//         uint64_t hash = 5381;
+//         const char *ptr = str;
+//         int c;
+
+//         while ((c = *ptr++)) {
+//             hash = ((hash << 5) + hash) + c;
+//         }
+
+//         fprintf(stderr, "Invalid seed format, using hash: %" PRIu64 "\n", hash);
+//         return hash;
+//     }
+
+//     return (uint64_t)ull_result;
+// }
+
 uint64_t parseSeed(const char *str) {
-    // Fast path: try a quick hash for very large values
-    size_t len = strlen(str);
-    if (len > 18) {  // A uint64_t can hold at most 20 digits
-        uint64_t hash = 5381;
-        const char *ptr = str;
-        int c;
-
-        while ((c = *ptr++)) {
-            hash = ((hash << 5) + hash) + c; // hash * 33 + c
-        }
-
-        fprintf(stderr, "Large seed detected, using hash: %" PRIu64 "\n", hash);
-        return hash;
-    }
-
-    // Standard path for smaller values
+    // Try direct conversion first, regardless of length
     char *endptr;
     errno = 0;
     unsigned long long ull_result = strtoull(str, &endptr, 10);
 
-    if (errno == ERANGE || *endptr != '\0') {
-        uint64_t hash = 5381;
-        const char *ptr = str;
-        int c;
-
-        while ((c = *ptr++)) {
-            hash = ((hash << 5) + hash) + c;
-        }
-
-        fprintf(stderr, "Invalid seed format, using hash: %" PRIu64 "\n", hash);
-        return hash;
+    // If the conversion was successful and complete
+    if (errno != ERANGE && *endptr == '\0') {
+        return (uint64_t)ull_result;
     }
 
+    // If the number is too large for uint64_t or invalid format,
+    // we could use a more advanced handling method here.
+    // For now, we'll use the original, which might truncate large values
+    // but will preserve more of the structure than a hash.
+    fprintf(stderr, "Warning: Seed is too large or invalid format, using numeric portion only: %llu\n", ull_result);
     return (uint64_t)ull_result;
 }
 
@@ -596,114 +644,130 @@ uint64_t parseSeed(const char *str) {
 //     return 0;
 // }
 
-int generateTile(Generator *g, uint64_t seed, int zoom, int x, int z) {
-    int tileSize = getTileSize(zoom);
-    printf("Generating tile at zoom %d (size: %d) for x=%d, z=%d\n", zoom, tileSize, x, z);
+// int generateTile(Generator *g, uint64_t seed, int zoom, int x, int z) {
+    // int tileSize = getTileSize(zoom);
+    // printf("Generating tile at zoom %d (size: %d) for x=%d, z=%d\n", zoom, tileSize, x, z);
 
-    // Original biome calculation dimensions
-    Range r = {
-        .scale = CUBIOMES_SCALE,
-        .x = x * tileSize,
-        .z = z * tileSize,
-        .sx = tileSize,
-        .sz = tileSize,
-        .y = 15,
-        .sy = 1
-    };
-
-    const int outputWidth = 64;
-    const int outputHeight = 64;
+    int generateTile(Generator *g, uint64_t seed, const char *seedStr, int zoom, int x, int z) {
+        int tileSize = getTileSize(zoom);
+        printf("Generating tile at zoom %d (size: %d) for x=%d, z=%d\n", zoom, tileSize, x, z);
     
-    // Calculate scaling factors
-    const float widthScale = (float)outputWidth / (tileSize * PIXELS_PER_CELL);
-    const float heightScale = (float)outputHeight / (tileSize * PIXELS_PER_CELL);
-
-    printf("Range X: %d, Z: %d, SX: %d, SZ: %d\n", r.x, r.z, r.sx, r.sz);
-
-    int *biomeIds = malloc(sizeof(int) * r.sx * r.sz);
-    if (!biomeIds) {
-        fprintf(stderr, "Failed to allocate biome cache\n");
-        return 1;
-    }
-
-    // Temporary buffer for full resolution image
-    unsigned char *fullRgb = malloc(3 * tileSize * PIXELS_PER_CELL * tileSize * PIXELS_PER_CELL);
-    if (!fullRgb) {
-        fprintf(stderr, "Failed to allocate RGB buffer\n");
-        free(biomeIds);
-        return 1;
-    }
-
-    // Final output buffer
-    unsigned char *smallRgb = malloc(3 * outputWidth * outputHeight);
-    if (!smallRgb) {
-        fprintf(stderr, "Failed to allocate small RGB buffer\n");
-        free(biomeIds);
-        free(fullRgb);
-        return 1;
-    }
-
-    genBiomes(g, biomeIds, r);
-
-    unsigned char biomeColors[256][3];
-    initBiomeColors(biomeColors);
+        // Original biome calculation dimensions
+        Range r = {
+            .scale = CUBIOMES_SCALE,
+            .x = x * tileSize,
+            .z = z * tileSize,
+            .sx = tileSize,
+            .sz = tileSize,
+            .y = 15,
+            .sy = 1
+        };
     
-    // Generate at full resolution first
-    parallelBiomesToImage(fullRgb, biomeColors, biomeIds, 
-                        tileSize * PIXELS_PER_CELL, 
-                        tileSize * PIXELS_PER_CELL, 
-                        PIXELS_PER_CELL);
-
-    // Scale down to 16x16
-    for (int y = 0; y < outputHeight; y++) {
-        for (int x = 0; x < outputWidth; x++) {
-            // Calculate corresponding position in full resolution image
-            int srcX = (int)(x / widthScale);
-            int srcY = (int)(y / heightScale);
-            
-            // Copy pixel
-            memcpy(&smallRgb[(y * outputWidth + x) * 3],
-                  &fullRgb[(srcY * tileSize * PIXELS_PER_CELL + srcX) * 3],
-                  3);
+        const int outputWidth = 64;
+        const int outputHeight = 64;
+        
+        // Calculate scaling factors
+        const float widthScale = (float)outputWidth / (tileSize * PIXELS_PER_CELL);
+        const float heightScale = (float)outputHeight / (tileSize * PIXELS_PER_CELL);
+    
+        printf("Range X: %d, Z: %d, SX: %d, SZ: %d\n", r.x, r.z, r.sx, r.sz);
+    
+        int *biomeIds = malloc(sizeof(int) * r.sx * r.sz);
+        if (!biomeIds) {
+            fprintf(stderr, "Failed to allocate biome cache\n");
+            return 1;
         }
-    }
-
-    char outputPath[MAX_PATH_LENGTH];
-    if (createOutputPath(outputPath, sizeof(outputPath), seed, zoom, x, z) < 0) {
-        fprintf(stderr, "Failed to create output path\n");
+    
+        // Temporary buffer for full resolution image
+        unsigned char *fullRgb = malloc(3 * tileSize * PIXELS_PER_CELL * tileSize * PIXELS_PER_CELL);
+        if (!fullRgb) {
+            fprintf(stderr, "Failed to allocate RGB buffer\n");
+            free(biomeIds);
+            return 1;
+        }
+    
+        // Final output buffer
+        unsigned char *smallRgb = malloc(3 * outputWidth * outputHeight);
+        if (!smallRgb) {
+            fprintf(stderr, "Failed to allocate small RGB buffer\n");
+            free(biomeIds);
+            free(fullRgb);
+            return 1;
+        }
+    
+        genBiomes(g, biomeIds, r);
+    
+        unsigned char biomeColors[256][3];
+        initBiomeColors(biomeColors);
+        
+        // Generate at full resolution first
+        parallelBiomesToImage(fullRgb, biomeColors, biomeIds, 
+                            tileSize * PIXELS_PER_CELL, 
+                            tileSize * PIXELS_PER_CELL, 
+                            PIXELS_PER_CELL);
+    
+        // Scale down to output dimensions
+        for (int y = 0; y < outputHeight; y++) {
+            for (int x = 0; x < outputWidth; x++) {
+                // Calculate corresponding position in full resolution image
+                int srcX = (int)(x / widthScale);
+                int srcY = (int)(y / heightScale);
+                
+                // Copy pixel
+                memcpy(&smallRgb[(y * outputWidth + x) * 3],
+                      &fullRgb[(srcY * tileSize * PIXELS_PER_CELL + srcX) * 3],
+                      3);
+            }
+        }
+    
+        char outputPath[MAX_PATH_LENGTH];
+        if (createOutputPath(outputPath, sizeof(outputPath), seedStr, zoom, x, z) < 0) {
+            fprintf(stderr, "Failed to create output path\n");
+            free(biomeIds);
+            free(fullRgb);
+            free(smallRgb);
+            return 1;
+        }
+    
+        if (savePPM(outputPath, smallRgb, outputWidth, outputHeight) != 0) {
+            fprintf(stderr, "Error saving PPM file\n");
+            free(biomeIds);
+            free(fullRgb);
+            free(smallRgb);
+            return 1;
+        }
+    
+        printf("Saved: %s\n", outputPath);
         free(biomeIds);
         free(fullRgb);
         free(smallRgb);
-        return 1;
+        return 0;
     }
-
-    if (savePPM(outputPath, smallRgb, outputWidth, outputHeight) != 0) {
-        fprintf(stderr, "Error saving PPM file\n");
-        free(biomeIds);
-        free(fullRgb);
-        free(smallRgb);
-        return 1;
-    }
-
-    printf("Saved: %s\n", outputPath);
-    free(biomeIds);
-    free(fullRgb);
-    free(smallRgb);
-    return 0;
-}
 
 void showUsage(const char *program) {
     fprintf(stderr, "Usage: %s <seed> <zoom> <x> <z>\n", program);
     fprintf(stderr, "  Generates tiles for all zoom levels (0-%d) using the same x,z coordinates\n", MAX_ZOOM);
 }
 
+// int main(int argc, char *argv[]) {
+//     if (argc < 5) {
+//         showUsage(argv[0]);
+//         return 1;
+//     }
+
+//     uint64_t seed = parseSeed(argv[1]);
+//     int baseZoom = atoi(argv[2]);
+//     int x = atoi(argv[3]);
+//     int z = atoi(argv[4]);
 int main(int argc, char *argv[]) {
     if (argc < 5) {
         showUsage(argv[0]);
         return 1;
     }
 
-    uint64_t seed = parseSeed(argv[1]);
+    const char *seedStr = argv[1]; // Keep original string
+    uint64_t seed = parseSeed(seedStr); // Parse for generator
+
     int baseZoom = atoi(argv[2]);
     int x = atoi(argv[3]);
     int z = atoi(argv[4]);
@@ -716,26 +780,46 @@ int main(int argc, char *argv[]) {
     printf("Seed: %" PRIu64 ", Base Zoom: %d, X: %d, Z: %d\n", seed, baseZoom, x, z);
     printf("Generating tiles for all zoom levels (0-%d) with same coordinates...\n", MAX_ZOOM);
 
+//     Generator g;
+//     setupGenerator(&g, MC_1_20, 0);
+//     applySeed(&g, DIM_OVERWORLD, seed);
+
+//     // First generate the base zoom level tile
+//     if (generateTile(&g, seed, baseZoom, x, z) != 0) {
+//         fprintf(stderr, "Failed to generate base tile\n");
+//         return 1;
+//     }
+
+//     // Then generate tiles for all other zoom levels using the same x,z
+//     for (int zoom = MIN_ZOOM; zoom <= MAX_ZOOM; zoom++) {
+//         // Skip the base zoom level as we already generated it
+//         if (zoom == baseZoom) continue;
+        
+//         // Generate the tile for this zoom level using the same x,z coordinates
+//         if (generateTile(&g, seed, zoom, x, z) != 0) {
+//             fprintf(stderr, "Failed to generate tile for zoom level %d\n", zoom);
+//             // Continue with other zoom levels
+//         }
+//     }
+
+//     printf("All tiles generated successfully.\n");
+//     return 0;
+// }
+
     Generator g;
     setupGenerator(&g, MC_1_20, 0);
-    applySeed(&g, DIM_OVERWORLD, seed);
+    applySeed(&g, DIM_OVERWORLD, seed); // Use parsed seed for generation
 
-    // First generate the base zoom level tile
-    if (generateTile(&g, seed, baseZoom, x, z) != 0) {
+    // Pass both parsed seed (for biome gen) and original string (for path)
+    if (generateTile(&g, seed, seedStr, baseZoom, x, z) != 0) {
         fprintf(stderr, "Failed to generate base tile\n");
         return 1;
     }
 
-    // Then generate tiles for all other zoom levels using the same x,z
+    // Generate other zoom levels
     for (int zoom = MIN_ZOOM; zoom <= MAX_ZOOM; zoom++) {
-        // Skip the base zoom level as we already generated it
         if (zoom == baseZoom) continue;
-        
-        // Generate the tile for this zoom level using the same x,z coordinates
-        if (generateTile(&g, seed, zoom, x, z) != 0) {
-            fprintf(stderr, "Failed to generate tile for zoom level %d\n", zoom);
-            // Continue with other zoom levels
-        }
+        generateTile(&g, seed, seedStr, zoom, x, z);
     }
 
     printf("All tiles generated successfully.\n");
