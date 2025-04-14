@@ -611,8 +611,8 @@ int generateTile(Generator *g, uint64_t seed, int zoom, int x, int z) {
         .sy = 1
     };
 
-    const int outputWidth = 128;
-    const int outputHeight = 128;
+    const int outputWidth = 64;
+    const int outputHeight = 64;
     
     // Calculate scaling factors
     const float widthScale = (float)outputWidth / (tileSize * PIXELS_PER_CELL);
