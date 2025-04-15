@@ -424,8 +424,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const char *seedStr = argv[1]; // Keep original string
-    uint64_t seed = parseSeed(seedStr); // Parse for generator
+    const char *seedStr = argv[1];
+    uint64_t seed = parseSeed(seedStr);
 
     int baseZoom = atoi(argv[2]);
     int x = atoi(argv[3]);
