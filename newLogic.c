@@ -322,8 +322,8 @@ uint64_t parseSeed(const char *str) {
             .sy = 1
         };
     
-        const int outputWidth = 64;
-        const int outputHeight = 64;
+        const int outputWidth = 256;
+        const int outputHeight = 256;
         
         // Calculate scaling factors
         const float widthScale = (float)outputWidth / (tileSize * PIXELS_PER_CELL);
